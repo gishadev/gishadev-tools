@@ -13,8 +13,9 @@ namespace Gisha.Effects.Audio
             _audioSource = GetComponent<AudioSource>();
         }
 
-        private void OnEnable()
+        public void StartTimer()
         {
+            StopAllCoroutines();
             StartCoroutine(DisableOnAudioComplete());
         }
 

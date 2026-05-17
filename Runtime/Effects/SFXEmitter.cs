@@ -34,7 +34,7 @@ namespace gishadev.tools.Effects
                 audioSource.clip = poolObject.AudioClips[Random.Range(0, poolObject.AudioClips.Length)];
             
             audioSource.Play();
-            obj.GetOrAddComponent<DisableSFXOnComplete>();
+            obj.GetOrAddComponent<DisableSFXOnComplete>().StartTimer();
 
             return obj;
         }

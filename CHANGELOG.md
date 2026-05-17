@@ -1,3 +1,8 @@
+## [1.1.1] - 2026-17-05
+### Minor fixes
+- PoolManager fixes
+- SFX Emitter & DisableSFXOnComplete fixes for longer SFX
+
 ## [1.1.0] - 2025-25-08
 ### Workflow improvements and fixes
 - Pool emitters improvements

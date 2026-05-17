@@ -6,7 +6,6 @@ using UnityEngine.SceneManagement;
 using VContainer;
 using VContainer.Unity;
 using Object = UnityEngine.Object;
-using Random = System.Random;
 
 namespace gishadev.tools.Pooling
 {
@@ -65,8 +64,7 @@ namespace gishadev.tools.Pooling
             if (poolObj.Equals(null))
                 return false;
 
-            var po = GetOrCreatePoolObject(prefab, collection.ToList());
-            if (_objectsByPoolObject.TryGetValue(po, out var sceneObjectsList))
+            if (_objectsByPoolObject.TryGetValue(poolObj, out var sceneObjectsList))
             {
                 if (sceneObjectsList.Any(x => !x.activeInHierarchy))
                 {
@@ -76,11 +74,11 @@ namespace gishadev.tools.Pooling
             }
             else
             {
-                _objectsByPoolObject.Add(po, new List<GameObject>());
-                CreateObjectParent(po);
+                _objectsByPoolObject.Add(poolObj, new List<GameObject>());
+                CreateObjectParent(poolObj);
             }
 
-            emittedObj = InstantiateNewObject(prefab, po);
+            emittedObj = InstantiateNewObject(prefab, poolObj);
             return true;
         }
 
@@ -112,7 +110,7 @@ namespace gishadev.tools.Pooling
             if (sceneObjectsList.Count > 1)
             {
                 List<GameObject> unactiveObjects = sceneObjectsList.Where(x => !x.activeInHierarchy).ToList();
-                objectToActivate = unactiveObjects.ElementAtOrDefault(new Random().Next() % unactiveObjects.Count());
+                objectToActivate = unactiveObjects[UnityEngine.Random.Range(0, unactiveObjects.Count)];
             }
             else
                 objectToActivate = sceneObjectsList.FirstOrDefault(x => !x.activeInHierarchy);
@@ -123,23 +121,6 @@ namespace gishadev.tools.Pooling
         }
 
         #endregion
-
-        private IPoolObject GetOrCreatePoolObject(GameObject prefab, List<T> poolCollection)
-        {
-            var prefabId = prefab.GetInstanceID();
-            var index = poolCollection.FindIndex(x => x.InstanceIds.Contains(prefabId));
-
-            if (index == -1)
-            {
-                var newPO = (T)Activator.CreateInstance(typeof(T), prefab);
-                poolCollection.Add(newPO);
-                index = poolCollection.Count - 1;
-
-                Debug.LogFormat($"New Pool Object was created with name {newPO.Name}");
-            }
-
-            return poolCollection[index];
-        }
 
         private void CreateObjectParent(IPoolObject poKey)
         {
