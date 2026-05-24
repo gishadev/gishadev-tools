@@ -1,3 +1,7 @@
+## [1.1.2] - 2026-17-05
+### Minor fixes
+- Virtual fields Enter and Exit in Page.cs
+
 ## [1.1.1] - 2026-17-05
 ### Minor fixes
 - PoolManager fixes

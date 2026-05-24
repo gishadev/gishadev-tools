@@ -25,7 +25,7 @@ namespace gishadev.tools.UI
             _isInitialized = true;
         }
 
-        public void Enter()
+        public virtual void Enter()
         {
             TryInitTransitions();
 
@@ -33,7 +33,7 @@ namespace gishadev.tools.UI
             Changed?.Invoke();
         }
 
-        public void Exit()
+        public virtual void Exit()
         {
             TryInitTransitions();
 
