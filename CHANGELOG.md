@@ -1,3 +1,6 @@
+## [1.1.3] - 2026-21-07
+- Added Modern WEBGL Template
+
 ## [1.1.2] - 2026-17-05
 ### Minor fixes
 - Virtual fields Enter and Exit in Page.cs
