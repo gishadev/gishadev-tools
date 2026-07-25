@@ -71,10 +71,14 @@ namespace gishadev.tools.Audio
             _fadeCTS?.Cancel();
             _fadeCTS = new CancellationTokenSource();
 
-            if (newMusic.AudioSource != null && newMusic.IsFade)
+            if (newMusic.AudioSource != null)
             {
                 newMusic.AudioSource.Play();
-                await _audioManager.FadeIn(newMusic, _fadeCTS);
+
+                if (newMusic.IsFade)
+                    await _audioManager.FadeIn(newMusic, _fadeCTS);
+                else
+                    newMusic.AudioSource.volume = newMusic.InitialVolume * _audioManager.MusicVolumePercentage;
             }
 
             _currentMusic = newMusic;

@@ -28,6 +28,8 @@ namespace gishadev.tools.Audio
         private CancellationTokenSource _cts;
 
         public AudioMasterSO AudioMasterData => _audioMasterData;
+        public float MusicVolumePercentage => _musicVolumePercentage;
+        public float SFXVolumePercentage => _sfxVolumePercentage;
 
         public void Initialize()
         {
@@ -119,43 +121,40 @@ namespace gishadev.tools.Audio
 
         #endregion
 
-        // TODO: bugs with fades
         public async UniTask FadeIn(AudioData audioData, CancellationTokenSource fadeCTS)
         {
             audioData.AudioSource.volume = 0f;
-            var volume = audioData.AudioSource.volume;
             var linkedCTS = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, fadeCTS.Token);
 
-            while (!linkedCTS.IsCancellationRequested && audioData.AudioSource.volume * _musicVolumePercentage <
-                   audioData.InitialVolume * _musicVolumePercentage)
+            var targetVolume = audioData.InitialVolume * _musicVolumePercentage;
+            while (!linkedCTS.IsCancellationRequested && audioData.AudioSource.volume < targetVolume)
             {
-                volume += Time.deltaTime / AudioMasterData.FadeTransitionTime * _musicVolumePercentage;
-                audioData.AudioSource.volume = volume;
+                var volume = audioData.AudioSource.volume +
+                             targetVolume * Time.deltaTime / AudioMasterData.FadeTransitionTime;
+                audioData.AudioSource.volume = Mathf.Min(volume, targetVolume);
                 await UniTask.Yield(cancellationToken: linkedCTS.Token).SuppressCancellationThrow();
+                targetVolume = audioData.InitialVolume * _musicVolumePercentage;
             }
         }
 
         public async UniTask FadeOut(AudioData audioData, CancellationTokenSource fadeCTS)
         {
-            var volume = audioData.AudioSource.volume;
             var linkedCTS = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, fadeCTS.Token);
 
-            while (!linkedCTS.IsCancellationRequested &&
-                   audioData.AudioSource.volume * _musicVolumePercentage > float.Epsilon)
+            while (!linkedCTS.IsCancellationRequested && audioData.AudioSource.volume > 0f)
             {
-                volume -= Time.deltaTime / AudioMasterData.FadeTransitionTime * _musicVolumePercentage;
-                audioData.AudioSource.volume = volume;
+                var startVolume = audioData.InitialVolume * _musicVolumePercentage;
+                var volume = audioData.AudioSource.volume -
+                             startVolume * Time.deltaTime / AudioMasterData.FadeTransitionTime;
+                audioData.AudioSource.volume = Mathf.Max(volume, 0f);
                 await UniTask.Yield(cancellationToken: linkedCTS.Token).SuppressCancellationThrow();
             }
 
             if (linkedCTS.IsCancellationRequested)
                 return;
 
-            if (audioData.AudioSource.volume <= float.Epsilon)
-            {
-                audioData.AudioSource.Stop();
-                audioData.AudioSource.volume = audioData.InitialVolume * _musicVolumePercentage;
-            }
+            audioData.AudioSource.Stop();
+            audioData.AudioSource.volume = audioData.InitialVolume * _musicVolumePercentage;
         }
 
         public async void DelayFunc(DelayedDelegate delayedDelegate, float delay)

@@ -17,6 +17,7 @@ namespace gishadev.tools.Audio
             if (data.AudioClips.Length > 1)
                 data.AudioSource.clip = data.AudioClips[Random.Range(0, data.AudioClips.Length)];
 
+            data.AudioSource.volume = data.InitialVolume * _audioManager.SFXVolumePercentage;
             data.AudioSource.Play();
         }
 

@@ -1,3 +1,10 @@
+## [1.1.4] - 2026-26-07
+### Audio fixes
+- Music with `IsFade = false` now plays instead of staying silent
+- SFX and non-fade music apply `InitialVolume` (and volume percentage) when starting
+- Fixed music fades: volume percentage now sets the fade target, not the fade speed (no more ignored volume, overshoot, or skipped stop)
+- Music fades now react to volume changes mid-fade
+
 ## [1.1.3] - 2026-21-07
 - Added Modern WEBGL Template
 
