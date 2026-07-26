@@ -78,7 +78,7 @@ namespace gishadev.tools.Audio
                 if (newMusic.IsFade)
                     await _audioManager.FadeIn(newMusic, _fadeCTS);
                 else
-                    newMusic.AudioSource.volume = newMusic.InitialVolume * _audioManager.MusicVolumePercentage;
+                    newMusic.AudioSource.volume = _audioManager.GetEffectiveVolume(newMusic);
             }
 
             _currentMusic = newMusic;

@@ -18,9 +18,11 @@ namespace gishadev.tools.Audio
         public delegate void DelayedDelegate();
 
         public event Action<AudioData> AudioStarted;
+        public event Action VolumeChanged;
 
         private static GameObject _audioParent;
 
+        private float _masterVolumePercentage = 1f;
         private float _musicVolumePercentage = 1f;
         private float _sfxVolumePercentage = 1f;
 
@@ -28,6 +30,7 @@ namespace gishadev.tools.Audio
         private CancellationTokenSource _cts;
 
         public AudioMasterSO AudioMasterData => _audioMasterData;
+        public float MasterVolumePercentage => _masterVolumePercentage;
         public float MusicVolumePercentage => _musicVolumePercentage;
         public float SFXVolumePercentage => _sfxVolumePercentage;
 
@@ -45,24 +48,39 @@ namespace gishadev.tools.Audio
             _cts?.Cancel();
         }
 
+        public void SetMasterVolume(float volumePercent)
+        {
+            _masterVolumePercentage = Mathf.Clamp01(volumePercent);
+
+            ApplyVolume(GetAudioCollection<SFXData>());
+            ApplyVolume(GetAudioCollection<MusicData>());
+            VolumeChanged?.Invoke();
+        }
+
         public void SetSFXVolume(float volumePercent)
         {
-            var sfxData = GetAudioCollection<SFXData>();
-
-            foreach (var sfx in sfxData)
-                sfx.AudioSource.volume = volumePercent * sfx.InitialVolume;
-
-            _sfxVolumePercentage = volumePercent;
+            _sfxVolumePercentage = Mathf.Clamp01(volumePercent);
+            ApplyVolume(GetAudioCollection<SFXData>());
+            VolumeChanged?.Invoke();
         }
 
         public void SetMusicVolume(float volumePercent)
         {
-            var musicData = GetAudioCollection<MusicData>();
+            _musicVolumePercentage = Mathf.Clamp01(volumePercent);
+            ApplyVolume(GetAudioCollection<MusicData>());
+            VolumeChanged?.Invoke();
+        }
 
-            foreach (var music in musicData)
-                music.AudioSource.volume = volumePercent * music.InitialVolume;
+        public float GetEffectiveVolume(AudioData audioData)
+        {
+            var typeVolume = audioData is MusicData ? _musicVolumePercentage : _sfxVolumePercentage;
+            return audioData.InitialVolume * typeVolume * _masterVolumePercentage;
+        }
 
-            _musicVolumePercentage = volumePercent;
+        private void ApplyVolume(IEnumerable<AudioData> collection)
+        {
+            foreach (var audio in collection)
+                audio.AudioSource.volume = GetEffectiveVolume(audio);
         }
 
         public void PlaySFX(int index) => PlayAudio<SFXData>(index);
@@ -126,14 +144,14 @@ namespace gishadev.tools.Audio
             audioData.AudioSource.volume = 0f;
             var linkedCTS = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, fadeCTS.Token);
 
-            var targetVolume = audioData.InitialVolume * _musicVolumePercentage;
+            var targetVolume = GetEffectiveVolume(audioData);
             while (!linkedCTS.IsCancellationRequested && audioData.AudioSource.volume < targetVolume)
             {
                 var volume = audioData.AudioSource.volume +
                              targetVolume * Time.deltaTime / AudioMasterData.FadeTransitionTime;
                 audioData.AudioSource.volume = Mathf.Min(volume, targetVolume);
                 await UniTask.Yield(cancellationToken: linkedCTS.Token).SuppressCancellationThrow();
-                targetVolume = audioData.InitialVolume * _musicVolumePercentage;
+                targetVolume = GetEffectiveVolume(audioData);
             }
         }
 
@@ -143,7 +161,7 @@ namespace gishadev.tools.Audio
 
             while (!linkedCTS.IsCancellationRequested && audioData.AudioSource.volume > 0f)
             {
-                var startVolume = audioData.InitialVolume * _musicVolumePercentage;
+                var startVolume = GetEffectiveVolume(audioData);
                 var volume = audioData.AudioSource.volume -
                              startVolume * Time.deltaTime / AudioMasterData.FadeTransitionTime;
                 audioData.AudioSource.volume = Mathf.Max(volume, 0f);
@@ -154,7 +172,7 @@ namespace gishadev.tools.Audio
                 return;
 
             audioData.AudioSource.Stop();
-            audioData.AudioSource.volume = audioData.InitialVolume * _musicVolumePercentage;
+            audioData.AudioSource.volume = GetEffectiveVolume(audioData);
         }
 
         public async void DelayFunc(DelayedDelegate delayedDelegate, float delay)
