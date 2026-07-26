@@ -1,7 +1,10 @@
+## [1.2.1] - 2026-26-07
+- Volume control on `IAudioManager` is now via get/set properties: `MasterVolumePercentage`, `MusicVolumePercentage`, `SFXVolumePercentage` (replaces `SetSFXVolume`/`SetMusicVolume` methods)
+- Added `GetEffectiveVolume(AudioData)` to `IAudioManager`
+
 ## [1.2.0] - 2026-26-07
 ### Master volume & SFXEmitter volume support
-- Added `SetMasterVolume` to `IAudioManager` — scales all audio relative to SFX/music volumes (`InitialVolume × typeVolume × masterVolume`)
-- Added `MasterVolumePercentage`, `MusicVolumePercentage`, `SFXVolumePercentage` getters to `IAudioManager`
+- Added master volume — scales all audio relative to SFX/music volumes (`InitialVolume × typeVolume × masterVolume`)
 - Added `VolumeChanged` event to `IAudioManager`, fired on any volume setter
 - `SFXEmitter` now applies SFX and master volume to emitted pooled sounds (previously ignored AudioManager volumes) and updates already-playing ones on `VolumeChanged`
 - Added `SFXBaseVolume` component caching the authored volume of pooled SFX instances so reuse doesn't compound scaling

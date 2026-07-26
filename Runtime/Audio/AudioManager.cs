@@ -30,9 +30,23 @@ namespace gishadev.tools.Audio
         private CancellationTokenSource _cts;
 
         public AudioMasterSO AudioMasterData => _audioMasterData;
-        public float MasterVolumePercentage => _masterVolumePercentage;
-        public float MusicVolumePercentage => _musicVolumePercentage;
-        public float SFXVolumePercentage => _sfxVolumePercentage;
+        public float MasterVolumePercentage
+        {
+            get => _masterVolumePercentage;
+            set => SetMasterVolume(value);
+        }
+
+        public float MusicVolumePercentage
+        {
+            get => _musicVolumePercentage;
+            set => SetMusicVolume(value);
+        }
+
+        public float SFXVolumePercentage
+        {
+            get => _sfxVolumePercentage;
+            set => SetSFXVolume(value);
+        }
 
         public void Initialize()
         {
@@ -48,7 +62,7 @@ namespace gishadev.tools.Audio
             _cts?.Cancel();
         }
 
-        public void SetMasterVolume(float volumePercent)
+        private void SetMasterVolume(float volumePercent)
         {
             _masterVolumePercentage = Mathf.Clamp01(volumePercent);
 
@@ -57,14 +71,14 @@ namespace gishadev.tools.Audio
             VolumeChanged?.Invoke();
         }
 
-        public void SetSFXVolume(float volumePercent)
+        private void SetSFXVolume(float volumePercent)
         {
             _sfxVolumePercentage = Mathf.Clamp01(volumePercent);
             ApplyVolume(GetAudioCollection<SFXData>());
             VolumeChanged?.Invoke();
         }
 
-        public void SetMusicVolume(float volumePercent)
+        private void SetMusicVolume(float volumePercent)
         {
             _musicVolumePercentage = Mathf.Clamp01(volumePercent);
             ApplyVolume(GetAudioCollection<MusicData>());
