@@ -1,5 +1,5 @@
 ## [1.2.1] - 2026-26-07
-- Volume control on `IAudioManager` is now via get/set properties: `MasterVolumePercentage`, `MusicVolumePercentage`, `SFXVolumePercentage` (replaces `SetSFXVolume`/`SetMusicVolume` methods)
+- Added read-only volume getters to `IAudioManager`: `MasterVolumePercentage`, `MusicVolumePercentage`, `SFXVolumePercentage`; volumes are set via `Set*Volume` methods
 - Added `GetEffectiveVolume(AudioData)` to `IAudioManager`
 
 ## [1.2.0] - 2026-26-07
