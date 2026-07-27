@@ -27,9 +27,9 @@ namespace gishadev.tools.Core
             str.AppendLine();
             str.AppendFormat("public static void PlaySFX(this IAudioManager @this, SFXAudioEnum sfx) => @this.PlaySFX((int)sfx);");
             str.AppendLine();
-            str.AppendFormat("public static GameObject EmitAt(this ISFXEmitter @this, SoundEffectsEnum sfx, Vector3 position, Quaternion rotation) => @this.EmitAt((int)sfx, position, rotation);");
+            str.AppendFormat("public static GameObject EmitAt(this ISFXEmitter @this, SFXPoolEnum sfx, Vector3 position, Quaternion rotation) => @this.EmitAt((int)sfx, position, rotation);");
             str.AppendLine();
-            str.AppendFormat("public static GameObject EmitAt(this IVFXEmitter @this, VisualEffectsEnum vfx, Vector3 position, Quaternion rotation) => @this.EmitAt((int)vfx, position, rotation);");
+            str.AppendFormat("public static GameObject EmitAt(this IVFXEmitter @this, VFXPoolEnum vfx, Vector3 position, Quaternion rotation) => @this.EmitAt((int)vfx, position, rotation);");
             str.AppendLine();
             str.AppendFormat("public static GameObject EmitAt(this IOtherEmitter @this, OtherPoolEnum other, Vector3 position, Quaternion rotation) => @this.EmitAt((int)other, position, rotation);");
             str.AppendLine();
@@ -42,7 +42,7 @@ namespace gishadev.tools.Core
             File.WriteAllText(path, str.ToString());
             AssetDatabase.ImportAsset(path);
         }
-        
+
         public static void GenerateEnumClass(string enumName, string[] enumEntries)
         {
             string path = "Assets/_Project/Generated/" + enumName + ".cs";
