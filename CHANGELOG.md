@@ -1,3 +1,11 @@
+## [1.3.0] - 2026-27-07
+### Extensions, Pooling & SceneLoader refactor
+- Reorganized `Extensions` into focused files (`GameObjectExtensions`, `CollectionExtensions`, `TransformExtensions`, `VectorExtensions`, `ColorExtensions`, `CancellationTokenSourceExtensions`) and fixed the namespace (was `gishadev.tools.Core`, now `gishadev.tools.Extensions`)
+- Added `GetRandomElement`, `IsNullOrEmpty`, `HasComponent`, `DestroyChildren`, `ResetLocal`, `WithAlpha`, `Renew`, and `Vector3`/`Vector2.With`
+- `PoolManager<T>`: fixed a null-check ordering bug in `TryInstantiate`, removed dead reflection-based type switching in favor of the existing `PoolObjectsCollection`, simplified pool reset/activation logic
+- Split fade logic out of `SceneLoader` into a standalone `ScreenFader` you can use on its own (optional color/sorting order); `ISceneLoader.AsyncSceneLoad(string)` replaced by `ISceneLoader.LoadScene(string, bool fade = true)` (now awaitable, fade can be skipped)
+- Fixed a `NullReferenceException` in `DisableSFXOnComplete` when a pooled SFX has no clip assigned; `SFXEmitter`/`SFXPlayer`/`MusicPlayer` no longer clear an already-assigned clip when no pool clips are configured
+
 ## [1.2.1] - 2026-26-07
 - Added read-only volume getters to `IAudioManager`: `MasterVolumePercentage`, `MusicVolumePercentage`, `SFXVolumePercentage`; volumes are set via `Set*Volume` methods
 - Added `GetEffectiveVolume(AudioData)` to `IAudioManager`

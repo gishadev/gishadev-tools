@@ -11,7 +11,7 @@ namespace gishadev.tools.Core
     {
         public static void GenerateExtensionsClass()
         {
-            string path = "Assets/Generated/" + "GeneratedExtensionMethods" + ".cs";
+            string path = "Assets/_Project/Generated/" + "GeneratedExtensionMethods" + ".cs";
 
             var str = new StringBuilder();
             str.AppendFormat("using gishadev.tools.Audio;");
@@ -45,7 +45,7 @@ namespace gishadev.tools.Core
         
         public static void GenerateEnumClass(string enumName, string[] enumEntries)
         {
-            string path = "Assets/Generated/" + enumName + ".cs";
+            string path = "Assets/_Project/Generated/" + enumName + ".cs";
 
             var str = new StringBuilder();
             str.AppendFormat("public enum {0}", enumName);

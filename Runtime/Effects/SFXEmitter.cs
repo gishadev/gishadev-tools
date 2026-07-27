@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Gisha.Effects.Audio;
 using gishadev.tools.Audio;
-using gishadev.tools.Core;
+using gishadev.tools.Extensions;
 using gishadev.tools.Pooling;
 using UnityEngine;
 
@@ -59,8 +59,9 @@ namespace gishadev.tools.Effects
             audioSource.playOnAwake = false;
 
             var poolObject = PoolObjectsCollection[index];
-            if (poolObject.AudioClips.Length > 0)
-                audioSource.clip = poolObject.AudioClips[Random.Range(0, poolObject.AudioClips.Length)];
+            var clip = poolObject.AudioClips.GetRandomElement();
+            if (clip != null)
+                audioSource.clip = clip;
 
             var baseVolume = obj.GetOrAddComponent<SFXBaseVolume>().GetBaseVolume(audioSource);
             audioSource.volume = baseVolume * _audioManager.SFXVolumePercentage * _audioManager.MasterVolumePercentage;

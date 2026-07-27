@@ -1,7 +1,9 @@
+using Cysharp.Threading.Tasks;
+
 namespace gishadev.tools.SceneLoading
 {
     public interface ISceneLoader
     {
-        void AsyncSceneLoad(string sceneToLoad);
+        UniTask LoadScene(string sceneToLoad, bool fade = true);
     }
 }

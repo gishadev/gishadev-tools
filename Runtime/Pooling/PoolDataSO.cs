@@ -12,8 +12,6 @@ namespace gishadev.tools.Pooling
         [field: SerializeField] public VFXPoolObject[] VFXPoolObjects { get; private set; }
         [field: SerializeField] public OtherPoolObject[] OtherPoolObjects { get; private set; }
 
-
-
 #if UNITY_EDITOR
         // Enum auto generation method.
         public override void OnCollectionChanged()

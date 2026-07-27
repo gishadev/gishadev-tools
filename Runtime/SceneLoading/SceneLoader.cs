@@ -1,66 +1,41 @@
+using System;
 using Cysharp.Threading.Tasks;
-using PrimeTween;
-using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 using VContainer.Unity;
 
 namespace gishadev.tools.SceneLoading
 {
-    public class SceneLoader : ISceneLoader, IInitializable
+    public class SceneLoader : ISceneLoader, IInitializable, IDisposable
     {
-        private Canvas _canvas;
-
-        private Image _fadeImage;
-        private GameObject _fadeObject;
+        private ScreenFader _fader;
         private bool _isLoadingScene;
-        private GameObject _go;
 
         public void Initialize()
         {
-            _go = new GameObject("[SceneLoader]");
-            Object.DontDestroyOnLoad(_go);
-            
-            _canvas = _go.AddComponent<Canvas>();
-            _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            _canvas.sortingOrder = 9999;
-
-            _fadeObject = new GameObject("Fade");
-            _fadeObject.transform.SetParent(_canvas.transform);
-
-            _fadeImage = _fadeObject.AddComponent<Image>();
-            _fadeImage.color = Color.black;
-            _fadeImage.color = new Color(_fadeImage.color.r, _fadeImage.color.g, _fadeImage.color.b, 0f);
-            _fadeObject.gameObject.SetActive(false);
-
-            var rt = _fadeObject.GetComponent<RectTransform>();
-            rt.anchorMin = Vector2.zero;
-            rt.anchorMax = Vector2.one;
-            rt.sizeDelta = Vector2.zero;
-            rt.anchoredPosition = Vector2.zero;
-
-            _go.AddComponent<GraphicRaycaster>();
+            _fader = new ScreenFader();
         }
 
-        public async void AsyncSceneLoad(string sceneToLoad)
+        public void Dispose()
+        {
+            _fader?.Dispose();
+        }
+
+        public async UniTask LoadScene(string sceneToLoad, bool fade = true)
         {
             if (_isLoadingScene)
                 return;
 
             _isLoadingScene = true;
 
-            _fadeImage.color = new Color(_fadeImage.color.r, _fadeImage.color.g, _fadeImage.color.b, 0f);
-            _fadeObject.gameObject.SetActive(true);
-
-            await Tween.Alpha(_fadeImage, 1f, .5f);
+            if (fade)
+                await _fader.FadeIn();
 
             var loadOperation = SceneManager.LoadSceneAsync(sceneToLoad);
-
             while (loadOperation != null && !loadOperation.isDone)
                 await UniTask.Yield();
 
-            await Tween.Alpha(_fadeImage, 0f, .5f)
-                .OnComplete(() => _fadeObject.gameObject.SetActive(false));
+            if (fade)
+                await _fader.FadeOut();
 
             _isLoadingScene = false;
         }

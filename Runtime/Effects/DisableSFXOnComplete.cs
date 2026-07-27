@@ -21,7 +21,9 @@ namespace Gisha.Effects.Audio
 
         private IEnumerator DisableOnAudioComplete()
         {
-            yield return new WaitForSeconds(_audioSource.clip.length);
+            if (_audioSource.clip != null)
+                yield return new WaitForSeconds(_audioSource.clip.length);
+
             gameObject.SetActive(false);
         }
     }

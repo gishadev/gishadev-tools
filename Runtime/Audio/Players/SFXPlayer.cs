@@ -1,4 +1,4 @@
-using UnityEngine;
+using gishadev.tools.Extensions;
 
 namespace gishadev.tools.Audio
 {
@@ -13,9 +13,9 @@ namespace gishadev.tools.Audio
 
         public override void Play(SFXData data)
         {
-            // Randomize clip.
-            if (data.AudioClips.Length > 1)
-                data.AudioSource.clip = data.AudioClips[Random.Range(0, data.AudioClips.Length)];
+            var clip = data.AudioClips.GetRandomElement();
+            if (clip != null)
+                data.AudioSource.clip = clip;
 
             data.AudioSource.volume = _audioManager.GetEffectiveVolume(data);
             data.AudioSource.Play();

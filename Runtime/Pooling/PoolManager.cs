@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using gishadev.tools.Extensions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using VContainer;
@@ -9,12 +10,12 @@ using Object = UnityEngine.Object;
 
 namespace gishadev.tools.Pooling
 {
-    public abstract class PoolManager<T> : IInitializable, IDisposable where T : PoolObject, new()
+    public abstract class PoolManager<T> : IInitializable, IDisposable where T : PoolObject
     {
         [Inject] protected PoolDataSO PoolDataSO { get; set; }
 
-        private Dictionary<IPoolObject, List<GameObject>> _objectsByPoolObject = new();
-        private Dictionary<IPoolObject, Transform> _parentByPoolObject = new();
+        private readonly Dictionary<IPoolObject, List<GameObject>> _objectsByPoolObject = new();
+        private readonly Dictionary<IPoolObject, Transform> _parentByPoolObject = new();
 
         protected abstract Transform Parent { get; set; }
         protected abstract List<T> PoolObjectsCollection { get; }
@@ -22,10 +23,7 @@ namespace gishadev.tools.Pooling
         public virtual void Initialize()
         {
             Object.DontDestroyOnLoad(Parent);
-            _objectsByPoolObject = new Dictionary<IPoolObject, List<GameObject>>();
-            _parentByPoolObject = new Dictionary<IPoolObject, Transform>();
-
-            InitializePools(PoolObjectsCollection);
+            ResetPools();
 
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
@@ -35,86 +33,64 @@ namespace gishadev.tools.Pooling
             SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
-        // Unload pools.
-        private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode) => ResetPools();
+
+        private void ResetPools()
         {
             foreach (var parent in _parentByPoolObject.Values)
                 Object.Destroy(parent.gameObject);
 
-            _objectsByPoolObject = new Dictionary<IPoolObject, List<GameObject>>();
-            _parentByPoolObject = new Dictionary<IPoolObject, Transform>();
+            _objectsByPoolObject.Clear();
+            _parentByPoolObject.Clear();
 
-            InitializePools(PoolObjectsCollection);
+            foreach (var poolObject in PoolObjectsCollection)
+            {
+                _objectsByPoolObject.Add(poolObject, new List<GameObject>());
+                CreateObjectParent(poolObject);
+            }
         }
 
         protected bool TryInstantiate(int index, out GameObject emittedObj)
         {
-            T[] collection;
-            if (typeof(T) == typeof(SFXPoolObject))
-                collection = PoolDataSO.SFXPoolObjects.Cast<T>().ToArray();
-            else if (typeof(T) == typeof(VFXPoolObject))
-                collection = PoolDataSO.VFXPoolObjects.Cast<T>().ToArray();
-            else
-                collection = PoolDataSO.OtherPoolObjects.Cast<T>().ToArray();
-
-            var poolObj = collection[index];
-            var prefab = poolObj.GetPrefab();
             emittedObj = null;
 
-            if (poolObj.Equals(null))
+            var poolObject = PoolObjectsCollection[index];
+            if (poolObject == null)
                 return false;
 
-            if (_objectsByPoolObject.TryGetValue(poolObj, out var sceneObjectsList))
+            // Objects are normally pre-registered by ResetPools, but register lazily too
+            // in case the pool data changed after Initialize (e.g. edited mid-session).
+            if (!_objectsByPoolObject.TryGetValue(poolObject, out var sceneObjects))
             {
-                if (sceneObjectsList.Any(x => !x.activeInHierarchy))
-                {
-                    emittedObj = ActivateAvailableObject(sceneObjectsList);
-                    return true;
-                }
+                sceneObjects = new List<GameObject>();
+                _objectsByPoolObject.Add(poolObject, sceneObjects);
+                CreateObjectParent(poolObject);
             }
-            else
+            else if (sceneObjects.Any(x => !x.activeInHierarchy))
             {
-                _objectsByPoolObject.Add(poolObj, new List<GameObject>());
-                CreateObjectParent(poolObj);
+                emittedObj = ActivateAvailableObject(sceneObjects);
+                return true;
             }
 
-            emittedObj = InstantiateNewObject(prefab, poolObj);
+            emittedObj = InstantiateNewObject(poolObject.GetPrefab(), poolObject);
             return true;
-        }
-
-        private void InitializePools(List<T> poolObjects)
-        {
-            foreach (var po in poolObjects)
-            {
-                _objectsByPoolObject.Add(po, new List<GameObject>());
-                CreateObjectParent(po);
-            }
         }
 
         #region Object Instantiating
 
-        private GameObject InstantiateNewObject(GameObject prefab,
-            IPoolObject po)
+        private GameObject InstantiateNewObject(GameObject prefab, IPoolObject poolObject)
         {
-            Transform parent = _parentByPoolObject[po];
+            Transform parent = _parentByPoolObject[poolObject];
 
             GameObject createdObject = Object.Instantiate(prefab, parent);
-            _objectsByPoolObject[po].Add(createdObject);
+            _objectsByPoolObject[poolObject].Add(createdObject);
 
             return createdObject;
         }
 
-        private GameObject ActivateAvailableObject(List<GameObject> sceneObjectsList)
+        private static GameObject ActivateAvailableObject(List<GameObject> sceneObjects)
         {
-            GameObject objectToActivate;
-            if (sceneObjectsList.Count > 1)
-            {
-                List<GameObject> unactiveObjects = sceneObjectsList.Where(x => !x.activeInHierarchy).ToList();
-                objectToActivate = unactiveObjects[UnityEngine.Random.Range(0, unactiveObjects.Count)];
-            }
-            else
-                objectToActivate = sceneObjectsList.FirstOrDefault(x => !x.activeInHierarchy);
-
+            var objectToActivate = sceneObjects.Where(x => !x.activeInHierarchy).ToList().GetRandomElement();
             objectToActivate.SetActive(true);
 
             return objectToActivate;
@@ -122,13 +98,13 @@ namespace gishadev.tools.Pooling
 
         #endregion
 
-        private void CreateObjectParent(IPoolObject poKey)
+        private void CreateObjectParent(IPoolObject poolObject)
         {
-            var name = $"[{poKey.GetType().Name}_{poKey.Name}]";
+            var name = $"[{poolObject.GetType().Name}_{poolObject.Name}]";
             var parent = new GameObject(name);
             parent.transform.SetParent(Parent);
 
-            _parentByPoolObject.Add(poKey, parent.transform);
+            _parentByPoolObject.Add(poolObject, parent.transform);
         }
     }
 }

@@ -1,5 +1,6 @@
 using System.Linq;
 using gishadev.tools.Core;
+using gishadev.tools.Extensions;
 using UnityEngine;
 
 namespace gishadev.tools.Pooling
@@ -25,7 +26,7 @@ namespace gishadev.tools.Pooling
 
         public GameObject GetPrefab()
         {
-            return Prefabs.Length > 1 ? Prefabs[Random.Range(0, Prefabs.Length)] : Prefabs[0];
+            return Prefabs.GetRandomElement();
         }
     }
 

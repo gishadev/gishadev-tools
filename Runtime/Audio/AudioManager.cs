@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using gishadev.tools.Extensions;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using VContainer;
@@ -186,8 +187,7 @@ namespace gishadev.tools.Audio
 
         public void CancelDelayFunc()
         {
-            _delayFuncCts?.Cancel();
-            _delayFuncCts = new CancellationTokenSource();
+            _delayFuncCts = _delayFuncCts.Renew();
         }
 
         private T[] GetAudioCollection<T>() where T : AudioData, new()

@@ -1,4 +1,4 @@
-using gishadev.tools.Core;
+using gishadev.tools.Extensions;
 using PrimeTween;
 using UnityEngine;
 

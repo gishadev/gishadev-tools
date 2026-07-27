@@ -1,9 +1,8 @@
 using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
-using gishadev.tools.Core;
+using gishadev.tools.Extensions;
 using UnityEngine.Events;
-using Random = UnityEngine.Random;
 
 namespace gishadev.tools.Audio
 {
@@ -23,9 +22,9 @@ namespace gishadev.tools.Audio
 
         public override void Play(MusicData data)
         {
-            // Randomize clip.
-            if (data.AudioClips.Length > 1)
-                data.AudioSource.clip = data.AudioClips[Random.Range(0, data.AudioClips.Length)];
+            var clip = data.AudioClips.GetRandomElement();
+            if (clip != null)
+                data.AudioSource.clip = clip;
 
             InitPlay(data);
         }
@@ -57,8 +56,7 @@ namespace gishadev.tools.Audio
 
         private async void InitPlay(MusicData newMusic)
         {
-            _fadeCTS?.Cancel();
-            _fadeCTS = new CancellationTokenSource();
+            _fadeCTS = _fadeCTS.Renew();
 
             if (_currentMusic != null)
             {
@@ -68,8 +66,7 @@ namespace gishadev.tools.Audio
                     _currentMusic.Stop();
             }
 
-            _fadeCTS?.Cancel();
-            _fadeCTS = new CancellationTokenSource();
+            _fadeCTS = _fadeCTS.Renew();
 
             if (newMusic.AudioSource != null)
             {
