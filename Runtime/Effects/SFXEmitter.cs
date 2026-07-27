@@ -47,13 +47,13 @@ namespace gishadev.tools.Effects
             }
         }
 
-        public GameObject EmitAt(int index, Vector3 position, Quaternion rotation)
+        public GameObject EmitAt(int index, Vector3 position, Quaternion? rotation = null)
         {
             if (!TryInstantiate(index, out var obj))
                 return null;
 
             obj.transform.position = position;
-            obj.transform.rotation = rotation;
+            obj.transform.rotation = rotation ?? Quaternion.identity;
 
             var audioSource = obj.GetOrAddComponent<AudioSource>();
             audioSource.playOnAwake = false;

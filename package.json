@@ -1,6 +1,6 @@
 {
   "name": "com.gishadev.tools",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "displayName": "Gishadev Tools",
   "description": "Tools to polish your game. Audio, Effects and a lot of other stuff!",
   "unity": "6000.0",

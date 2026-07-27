@@ -1,3 +1,10 @@
+## [1.4.0] - 2026-27-07
+### Changed
+- Renamed generated pool enums for brevity: `SoundEffectsEnum` → `SFXPoolEnum`, `VisualEffectsEnum` → `VFXPoolEnum` (matches `OtherPoolEnum` and the existing `SFXEmitter`/`VFXEmitter` naming)
+- Moved `GenerateExtensionsClass` out of `CodeGenerator` into `unity-setup` — it's static, one-time output tied to project setup rather than to `PoolDataSO`/`AudioMasterSO` changes, so it doesn't belong in the runtime package's per-edit codegen path
+### Added
+- `ISFXEmitter`/`IVFXEmitter`/`IOtherEmitter.EmitAt` now take `rotation` as optional (`Quaternion? rotation = null`, defaults to `Quaternion.identity`) since it's almost always left at identity
+
 ## [1.3.1] - 2026-27-07
 ### Fixed
 - `ScreenFader` no longer forces `DontDestroyOnLoad` on every instance — ad-hoc faders now die with their scene like any other GameObject instead of leaking, and defaulting `dontDestroyOnLoad` to `false`. Only `SceneLoader` opts in (`dontDestroyOnLoad: true`), since it needs to survive the scene swap it's fading over
