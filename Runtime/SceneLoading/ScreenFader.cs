@@ -48,6 +48,9 @@ namespace gishadev.tools.SceneLoading
 
         public async UniTask FadeIn(float duration = DefaultFadeDuration)
         {
+            if (_image == null)
+                return;
+
             _image.color = _image.color.WithAlpha(0f);
             _image.gameObject.SetActive(true);
 
@@ -56,7 +59,15 @@ namespace gishadev.tools.SceneLoading
 
         public async UniTask FadeOut(float duration = DefaultFadeDuration)
         {
+            if (_image == null)
+                return;
+
             await Tween.Alpha(_image, 0f, duration);
+
+            // The overlay may have been destroyed (scene unload, Dispose) while this was suspended.
+            if (_image == null)
+                return;
+
             _image.gameObject.SetActive(false);
         }
 
