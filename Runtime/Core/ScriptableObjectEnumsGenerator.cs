@@ -22,7 +22,6 @@ namespace gishadev.tools.Core
                 list[i].SetEnumIndex(i);
             }
 
-            CodeGenerator.GenerateExtensionsClass();
             CodeGenerator.GenerateEnumClass(enumName, entries);
         }
 #endif
