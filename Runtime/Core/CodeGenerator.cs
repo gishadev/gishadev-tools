@@ -11,7 +11,7 @@ namespace gishadev.tools.Core
     {
         public static void GenerateEnumClass(string enumName, string[] enumEntries)
         {
-            string path = "Assets/_Project/Generated/" + enumName + ".cs";
+            string path = "Assets/_Project/Scripts/Generated/" + enumName + ".cs";
 
             var str = new StringBuilder();
             str.AppendFormat("public enum {0}", enumName);
