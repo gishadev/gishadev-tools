@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using gishadev.tools.Pooling;
 using UnityEngine;
 
@@ -8,7 +7,7 @@ namespace gishadev.tools.Effects
     public class VFXEmitter : PoolManager<VFXPoolObject>, IVFXEmitter
     {
         protected override Transform Parent { get; set; }
-        protected override List<VFXPoolObject> PoolObjectsCollection => PoolDataSO.VFXPoolObjects.ToList();
+        protected override IReadOnlyList<VFXPoolObject> PoolObjectsCollection => PoolDataSO.VFXPoolObjects;
 
         public override void Initialize()
         {

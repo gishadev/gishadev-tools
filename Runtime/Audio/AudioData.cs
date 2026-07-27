@@ -38,7 +38,11 @@ namespace gishadev.tools.Audio
         {
             AudioSource = audioSource;
 
-            AudioSource.clip = AudioClips[0];
+            if (AudioClips == null || AudioClips.Length == 0)
+                Debug.LogWarning($"Audio entry '{Name}' has no AudioClips assigned - it will play nothing.");
+            else
+                AudioSource.clip = AudioClips[0];
+
             AudioSource.volume = InitialVolume;
             AudioSource.pitch = Pitch;
         }

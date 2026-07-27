@@ -1,5 +1,5 @@
 {
-    "name": "polish-tools.Editor",
+    "name": "gishadev.tools.Editor",
     "rootNamespace": "gishadev.tools",
     "references": [
         "GUID:0b10dfe5f43fa9d4b95c96e00f66989a"

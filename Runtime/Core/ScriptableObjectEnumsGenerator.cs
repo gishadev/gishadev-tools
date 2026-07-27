@@ -23,6 +23,10 @@ namespace gishadev.tools.Core
             }
 
             CodeGenerator.GenerateEnumClass(enumName, entries);
+
+            // Must run after the enum exists on disk - the typed overloads are only
+            // emitted for enums that have actually been generated.
+            CodeGenerator.GenerateExtensionsClass();
         }
 #endif
     }

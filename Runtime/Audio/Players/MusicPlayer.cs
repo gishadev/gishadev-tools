@@ -26,21 +26,31 @@ namespace gishadev.tools.Audio
             if (clip != null)
                 data.AudioSource.clip = clip;
 
-            InitPlay(data);
+            InitPlay(data).Forget();
         }
 
-        // If we have auto-sequencing - start next audio clip when delay is over. 
+        // If we have auto-sequencing - start next audio clip when delay is over.
         private void HandleAutoSequencing(MusicData data)
         {
             _audioManager.CancelDelayFunc();
-            if (data.AudioSource != null && _audioManager.AudioMasterData.MusicAutoSequencing)
-                _audioManager.DelayFunc(() =>
-                {
-                    var oldIndex = Array.FindIndex(data.AudioClips, x => x == data.AudioSource.clip);
-                    var nextValue = data.AudioClips.GetNextValue(oldIndex);
-                    data.AudioSource.clip = nextValue;
-                    InitPlay(data);
-                }, data.AudioSource.clip.length / data.AudioSource.pitch);
+
+            if (data.AudioSource == null || !_audioManager.AudioMasterData.MusicAutoSequencing)
+                return;
+
+            // Nothing to sequence off of - the track length is what schedules the next one.
+            if (data.AudioSource.clip == null || data.AudioClips.IsNullOrEmpty())
+                return;
+
+            _audioManager.DelayFunc(() =>
+            {
+                // FindIndex returns -1 when the playing clip isn't part of the collection
+                // (e.g. it came from the prefab) - fall back to starting the list over.
+                var oldIndex = Array.FindIndex(data.AudioClips, x => x == data.AudioSource.clip);
+                data.AudioSource.clip = oldIndex < 0
+                    ? data.AudioClips[0]
+                    : data.AudioClips.GetNextValue(oldIndex);
+                InitPlay(data).Forget();
+            }, data.AudioSource.clip.length / data.AudioSource.pitch).Forget();
         }
 
         public override void Pause(MusicData data)
@@ -54,7 +64,7 @@ namespace gishadev.tools.Audio
             _audioManager.CancelDelayFunc();
         }
 
-        private async void InitPlay(MusicData newMusic)
+        private async UniTaskVoid InitPlay(MusicData newMusic)
         {
             _fadeCTS = _fadeCTS.Renew();
 

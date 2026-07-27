@@ -1,11 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using gishadev.tools.Extensions;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using VContainer;
 using VContainer.Unity;
 using Object = UnityEngine.Object;
@@ -37,15 +35,21 @@ namespace gishadev.tools.Audio
 
         public void Initialize()
         {
+            if (_audioMasterData == null)
+            {
+                Debug.LogError(
+                    "AudioManager: no AudioMasterSO injected. Assign one on your GishadevToolsLifetimeScope.");
+                return;
+            }
+
             if (_audioParent != null)
                 return;
+
             Init();
-            SceneManager.sceneLoaded += OnSceneLoaded;
         }
 
         public void Dispose()
         {
-            SceneManager.sceneLoaded -= OnSceneLoaded;
             _cts?.Cancel();
         }
 
@@ -78,31 +82,30 @@ namespace gishadev.tools.Audio
             return audioData.InitialVolume * typeVolume * _masterVolumePercentage;
         }
 
-        private void ApplyVolume(IEnumerable<AudioData> collection)
+        private void ApplyVolume(AudioData[] collection)
         {
-            foreach (var audio in collection)
-                audio.AudioSource.volume = GetEffectiveVolume(audio);
+            for (int i = 0; i < collection.Length; i++)
+                collection[i].AudioSource.volume = GetEffectiveVolume(collection[i]);
         }
 
         public void PlaySFX(int index) => PlayAudio<SFXData>(index);
         public void PlayMusic(int index) => PlayAudio<MusicData>(index);
 
-        public void PlayAudio<T>(int index) where T : AudioData, new()
+        public void PlayAudio<T>(int index) where T : AudioData
         {
             var audioCollection = GetAudioCollection<T>();
 
-            if (index < 0 || index > audioCollection.Length - 1)
+            if (index < 0 || index >= audioCollection.Length)
             {
-                Debug.LogError("There is no sfx with index " + index);
+                Debug.LogError($"AudioManager: no {typeof(T).Name} at index {index} " +
+                               $"({audioCollection.Length} entries configured on {_audioMasterData.name}).");
                 return;
             }
 
-            var data = audioCollection.ToArray()[index];
+            var data = audioCollection[index];
             data.Play();
 
             AudioStarted?.Invoke(data);
-
-            Debug.Log($"I'm playing: {data.Name} of type {typeof(T)}");
         }
 
         #region Initialization
@@ -176,7 +179,7 @@ namespace gishadev.tools.Audio
             audioData.AudioSource.volume = GetEffectiveVolume(audioData);
         }
 
-        public async void DelayFunc(DelayedDelegate delayedDelegate, float delay)
+        public async UniTaskVoid DelayFunc(DelayedDelegate delayedDelegate, float delay)
         {
             var linkedCTS = CancellationTokenSource.CreateLinkedTokenSource(_delayFuncCts.Token, _cts.Token);
             await UniTask.WaitForSeconds(delay, cancellationToken: linkedCTS.Token).SuppressCancellationThrow();
@@ -190,15 +193,13 @@ namespace gishadev.tools.Audio
             _delayFuncCts = _delayFuncCts.Renew();
         }
 
-        private T[] GetAudioCollection<T>() where T : AudioData, new()
+        // Returns the backing array as-is - this is read on every play/volume change,
+        // so it must not allocate. MusicData[]/SFXData[] convert to AudioData[] covariantly.
+        private AudioData[] GetAudioCollection<T>() where T : AudioData
         {
             return typeof(T) == typeof(MusicData)
-                ? AudioMasterData.MusicCollection.Cast<T>().ToArray()
-                : AudioMasterData.SFXCollection.Cast<T>().ToArray();
-        }
-
-        private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
-        {
+                ? AudioMasterData.MusicCollection
+                : AudioMasterData.SFXCollection;
         }
     }
 }

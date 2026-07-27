@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
-using Gisha.Effects.Audio;
 using gishadev.tools.Audio;
 using gishadev.tools.Extensions;
 using gishadev.tools.Pooling;
@@ -11,7 +9,7 @@ namespace gishadev.tools.Effects
     public class SFXEmitter : PoolManager<SFXPoolObject>, ISFXEmitter
     {
         private readonly IAudioManager _audioManager;
-        private readonly List<AudioSource> _emittedSources = new();
+        private readonly HashSet<AudioSource> _emittedSources = new();
 
         public SFXEmitter(IAudioManager audioManager)
         {
@@ -19,7 +17,7 @@ namespace gishadev.tools.Effects
         }
 
         protected override Transform Parent { get; set; }
-        protected override List<SFXPoolObject> PoolObjectsCollection => PoolDataSO.SFXPoolObjects.ToList();
+        protected override IReadOnlyList<SFXPoolObject> PoolObjectsCollection => PoolDataSO.SFXPoolObjects;
 
         public override void Initialize()
         {
@@ -36,7 +34,7 @@ namespace gishadev.tools.Effects
 
         private void OnVolumeChanged()
         {
-            _emittedSources.RemoveAll(x => x == null);
+            _emittedSources.RemoveWhere(x => x == null);
             foreach (var source in _emittedSources)
             {
                 if (!source.gameObject.activeInHierarchy)
@@ -63,11 +61,17 @@ namespace gishadev.tools.Effects
             if (clip != null)
                 audioSource.clip = clip;
 
+            if (audioSource.clip == null)
+            {
+                Debug.LogWarning($"SFXEmitter: pool entry '{poolObject.Name}' has no AudioClips assigned and its " +
+                                 "prefab's AudioSource has no clip - nothing will play.", obj);
+                return obj;
+            }
+
             var baseVolume = obj.GetOrAddComponent<SFXBaseVolume>().GetBaseVolume(audioSource);
             audioSource.volume = baseVolume * _audioManager.SFXVolumePercentage * _audioManager.MasterVolumePercentage;
 
-            if (!_emittedSources.Contains(audioSource))
-                _emittedSources.Add(audioSource);
+            _emittedSources.Add(audioSource);
 
             audioSource.Play();
             obj.GetOrAddComponent<DisableSFXOnComplete>().StartTimer();

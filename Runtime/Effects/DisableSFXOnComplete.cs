@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-namespace Gisha.Effects.Audio
+namespace gishadev.tools.Effects
 {
     [RequireComponent(typeof(AudioSource))]
     public class DisableSFXOnComplete : MonoBehaviour

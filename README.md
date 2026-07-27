@@ -25,7 +25,7 @@ Or drop it in as a git submodule under `Assets/`.
 - **UI** — `Page`/`PageTransitionProcessor` and UI event broadcasters (button/slider/toggle/input-field → typed events)
 - **Extensions** — small, general-purpose extensions (`GetOrAddComponent`, `GetRandomElement`, `DestroyChildren`, `WithAlpha`, `With(x,y,z)` for vectors, etc.)
 - **Infrastructure** — `GishadevToolsLifetimeScope`, a VContainer lifetime scope wiring up the above
-- **Editor tooling** — `AudioEditor`, `PoolEditor` and a code generator that turns your `PoolDataSO`/`AudioMasterSO` entries into strongly-typed enums (see [`unity-setup`](https://github.com/gishadev/unity-setup), which scaffolds all of this into a new project)
+- **Editor tooling** — `AudioEditor`, `PoolEditor` and a code generator that turns your `PoolDataSO`/`AudioMasterSO` entries into strongly-typed enums, so you call `EmitAt(SFXPoolEnum.EXPLOSION, pos)` instead of passing raw indices (see [`unity-setup`](https://github.com/gishadev/unity-setup), which scaffolds all of this into a new project)
 
 ## Usage
 
@@ -34,8 +34,8 @@ Or drop it in as a git submodule under `Assets/`.
 [Inject] private ISFXEmitter _sfxEmitter;
 [Inject] private ISceneLoader _sceneLoader;
 
-_audioManager.PlayMusic((int)MusicAudioEnum.MUSIC_1);
-_sfxEmitter.EmitAt((int)SFXPoolEnum.EXPLOSION, hitPoint); // rotation defaults to identity
+_audioManager.PlayMusic(MusicAudioEnum.MUSIC_1);
+_sfxEmitter.EmitAt(SFXPoolEnum.EXPLOSION, hitPoint); // rotation defaults to identity
 await _sceneLoader.LoadScene("Level2"); // fades by default, pass fade: false to skip
 ```
 

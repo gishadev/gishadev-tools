@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using gishadev.tools.Pooling;
 using UnityEngine;
 
@@ -8,7 +7,7 @@ namespace gishadev.tools.Effects
     public class OtherEmitter : PoolManager<OtherPoolObject>, IOtherEmitter
     {
         protected override Transform Parent { get; set; }
-        protected override List<OtherPoolObject> PoolObjectsCollection => PoolDataSO.OtherPoolObjects.ToList();
+        protected override IReadOnlyList<OtherPoolObject> PoolObjectsCollection => PoolDataSO.OtherPoolObjects;
 
         public override void Initialize()
         {
