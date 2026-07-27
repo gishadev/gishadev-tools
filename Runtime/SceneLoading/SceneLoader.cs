@@ -12,7 +12,8 @@ namespace gishadev.tools.SceneLoading
 
         public void Initialize()
         {
-            _fader = new ScreenFader();
+            // Needs to survive the scene swap it's fading over, unlike an ad-hoc ScreenFader.
+            _fader = new ScreenFader(dontDestroyOnLoad: true);
         }
 
         public void Dispose()

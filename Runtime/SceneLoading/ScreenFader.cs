@@ -17,10 +17,15 @@ namespace gishadev.tools.SceneLoading
         private readonly GameObject _root;
         private readonly Image _image;
 
-        public ScreenFader(Color? color = null, int sortingOrder = 9999)
+        // dontDestroyOnLoad defaults to false: a fader created ad hoc dies with its scene like any
+        // other GameObject, so nothing leaks if you forget to Dispose it. Only opt in when you need
+        // the same fader to survive a scene load - e.g. SceneLoader, which stays visible while the
+        // new scene loads underneath it.
+        public ScreenFader(Color? color = null, int sortingOrder = 9999, bool dontDestroyOnLoad = false)
         {
             _root = new GameObject("[ScreenFader]");
-            Object.DontDestroyOnLoad(_root);
+            if (dontDestroyOnLoad)
+                Object.DontDestroyOnLoad(_root);
 
             var canvas = _root.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;

@@ -1,3 +1,7 @@
+## [1.3.1] - 2026-27-07
+### Fixed
+- `ScreenFader` no longer forces `DontDestroyOnLoad` on every instance — ad-hoc faders now die with their scene like any other GameObject instead of leaking, and defaulting `dontDestroyOnLoad` to `false`. Only `SceneLoader` opts in (`dontDestroyOnLoad: true`), since it needs to survive the scene swap it's fading over
+
 ## [1.3.0] - 2026-27-07
 ### Extensions, Pooling & SceneLoader refactor
 - Reorganized `Extensions` into focused files (`GameObjectExtensions`, `CollectionExtensions`, `TransformExtensions`, `VectorExtensions`, `ColorExtensions`, `CancellationTokenSourceExtensions`) and fixed the namespace (was `gishadev.tools.Core`, now `gishadev.tools.Extensions`)
