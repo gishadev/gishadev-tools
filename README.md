@@ -21,6 +21,7 @@ Or drop it in as a git submodule under `Assets/`.
 - **Pooling** — generic `PoolManager<T>` backing the emitters above; reuses inactive instances before instantiating new ones
 - **Events** — `EventChannelSO` (Bool/Float/Int/String/Vector variants) for ScriptableObject-based decoupled messaging
 - **StateMachine** — a lightweight state machine (`IState` + `StateMachine`)
+- **Timers** — `Timer.After(2f, …)` / `Timer.Every(0.5f, …)`; pass the calling component to tie a timer to its lifetime, or cancel it via the returned handle
 - **SceneLoading** — `SceneLoader` for async scene loads with an optional fade; `ScreenFader` is a standalone fade-overlay you can use on its own
 - **UI** — `Page`/`PageTransitionProcessor` and UI event broadcasters (button/slider/toggle/input-field → typed events)
 - **Extensions** — small, general-purpose extensions (`GetOrAddComponent`, `GetRandomElement`, `DestroyChildren`, `WithAlpha`, `With(x,y,z)` for vectors, etc.)
@@ -37,6 +38,10 @@ Or drop it in as a git submodule under `Assets/`.
 _audioManager.PlayMusic(MusicAudioEnum.MUSIC_1);
 _sfxEmitter.EmitAt(SFXPoolEnum.EXPLOSION, hitPoint); // rotation defaults to identity
 await _sceneLoader.LoadScene("Level2"); // fades by default, pass fade: false to skip
+
+Timer.After(2f, () => Debug.Log("done"), this);      // cancelled if this component is destroyed
+var loop = Timer.Every(0.5f, Spawn, this);
+loop.Cancel();
 ```
 
 Register `GishadevToolsLifetimeScope` in your scene (or as a parent scope) to get everything above injected.
