@@ -1,0 +1,46 @@
+# gishadev-tools
+
+`com.gishadev.tools` — a small Unity toolkit to polish your game: audio, pooled effects, events, state machines, scene loading and a handful of general-purpose extensions.
+
+Built for Unity 6, wired up with [VContainer](https://github.com/hadashiA/VContainer) for DI, [UniTask](https://github.com/Cysharp/UniTask) for async, and [PrimeTween](https://github.com/KyryloKuzyk/PrimeTween) for tweening.
+
+## Install
+
+Add via Package Manager → **Add package from git URL**:
+
+```
+https://github.com/gishadev/gishadev-tools.git
+```
+
+Or drop it in as a git submodule under `Assets/`.
+
+## What's inside
+
+- **Audio** — `AudioManager` for music/SFX playback with master/music/SFX volume mixing, fades, and auto-sequencing
+- **Effects** — `SFXEmitter` / `VFXEmitter` / `OtherEmitter`: pooled prefab emitters, `EmitAt(index, position, rotation?)`
+- **Pooling** — generic `PoolManager<T>` backing the emitters above; reuses inactive instances before instantiating new ones
+- **Events** — `EventChannelSO` (Bool/Float/Int/String/Vector variants) for ScriptableObject-based decoupled messaging
+- **StateMachine** — a lightweight state machine (`IState` + `StateMachine`)
+- **SceneLoading** — `SceneLoader` for async scene loads with an optional fade; `ScreenFader` is a standalone fade-overlay you can use on its own
+- **UI** — `Page`/`PageTransitionProcessor` and UI event broadcasters (button/slider/toggle/input-field → typed events)
+- **Extensions** — small, general-purpose extensions (`GetOrAddComponent`, `GetRandomElement`, `DestroyChildren`, `WithAlpha`, `With(x,y,z)` for vectors, etc.)
+- **Infrastructure** — `GishadevToolsLifetimeScope`, a VContainer lifetime scope wiring up the above
+- **Editor tooling** — `AudioEditor`, `PoolEditor` and a code generator that turns your `PoolDataSO`/`AudioMasterSO` entries into strongly-typed enums (see [`unity-setup`](https://github.com/gishadev/unity-setup), which scaffolds all of this into a new project)
+
+## Usage
+
+```csharp
+[Inject] private IAudioManager _audioManager;
+[Inject] private ISFXEmitter _sfxEmitter;
+[Inject] private ISceneLoader _sceneLoader;
+
+_audioManager.PlayMusic((int)MusicAudioEnum.MUSIC_1);
+_sfxEmitter.EmitAt((int)SFXPoolEnum.EXPLOSION, hitPoint); // rotation defaults to identity
+await _sceneLoader.LoadScene("Level2"); // fades by default, pass fade: false to skip
+```
+
+Register `GishadevToolsLifetimeScope` in your scene (or as a parent scope) to get everything above injected.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
