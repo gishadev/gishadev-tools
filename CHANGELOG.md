@@ -21,6 +21,18 @@
 - `MenuController.CurrentPage`, `PageCount`, `IsActive` and a `StackChanged` event, so UI can react to the stack without polling
 - `PopupPage.MenuController` and `PopupPage.IsTransitioning`
 
+### Modern WebGL template
+- Removed the "WebGL builds are not supported on mobile devices" banner inherited from Unity's stock template — it isn't true, and every phone player was seeing it over the game
+- Mobile touch fixes: `touch-action: none` (the browser was eating drags as scroll/pinch-zoom), `user-select: none`, no tap highlight, `overflow: hidden`, and a static viewport meta with `viewport-fit=cover` instead of one injected by user-agent sniffing
+- A failed loader used to hang on a frozen progress bar with nothing in the console. `script.onerror` now names the missing file and points at the two usual causes — Build folder not uploaded, or the server not sending `Content-Encoding` for `.br`/`.gz`. Load failures render in the page banner instead of a blocking `alert()`
+- Added a click-to-play overlay after loading, so the audio context is unlocked by a real user gesture instead of the game appearing to have broken sound (mainly iOS Safari). Focus moves to the canvas on dismiss, so keyboard input works immediately
+- Added Open Graph / Twitter card tags so shared links get a preview instead of a bare URL. Drop a 1200x630 `TemplateData/social-preview.png` in per project
+- Fullscreen: the icon now updates on Safari (`webkit`/`MS` change events were never listened for), `isFullscreen()` returns an actual boolean, the icon swaps via a CSS class instead of JS writing inline `background-image` with a different relative path than the stylesheet, and unsupported-fullscreen shows a banner instead of `alert()`
+- The loading screen's `logo.png` is a 1356x90 "play with headphones" banner, but `background-size: contain` squeezed it into a 200x200 box — it rendered 200x13 with 187px of the box left empty. The box is now 420x40, so the banner reads at 420x28 above the progress bar
+- Added `headphones-icon.png` (the glyph cropped out of that banner) as a 48x48 icon in the bottom-left corner, mirroring the fullscreen button's footprint and 0.333 opacity. It links to https://www.youtube.com/watch?v=dQw4w9WgXcQ in a new tab (`rel="noopener noreferrer"`)
+- Progress bar is CSS instead of two PNGs (deleted `progress-bar-empty/full.png`), with a percentage readout and `role="progressbar"`. Loading/warning colours moved to custom properties for per-project reskinning
+- Removed dead CSS (`#unity-footer`, duplicate `.unity-desktop`, `font-style: regular`), the redundant `Content-Type` meta and the inline `onclick`; canvas got fallback text and `tabindex`; the fullscreen button got an `aria-label`. The commented-out `beforeunload` snippet now uses `preventDefault()` + `returnValue` — the old `confirm()` version silently did nothing in modern browsers
+
 ## [1.6.0] - 2026-27-07
 ### Added
 - `Timer` (`gishadev.tools.Timers`) — UniTask-backed delays: `Timer.After(2f, action)` and `Timer.Every(0.5f, action)`, both returning a `TimerHandle` you can `Cancel()`. Overloads taking the calling `Component` link the timer to its lifetime, so callbacks stop when the object is destroyed instead of running against a dead GameObject. `ignoreTimeScale: true` keeps a timer running while the game is paused. Kept in its own namespace so importing `gishadev.tools.Core` doesn't pull a type called `Timer` into scope

@@ -2,96 +2,118 @@
 <html lang="en-us">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#121214">
     <title>{{{ PRODUCT_NAME }}}</title>
+    <meta name="description" content="{{{ PRODUCT_NAME }}} — a game by {{{ COMPANY_NAME }}}.">
+
+    <!-- Link previews. Drop a 1200x630 PNG at TemplateData/social-preview.png per project. -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{{{ PRODUCT_NAME }}}">
+    <meta property="og:description" content="{{{ PRODUCT_NAME }}} — a game by {{{ COMPANY_NAME }}}.">
+    <meta property="og:image" content="TemplateData/social-preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{{ PRODUCT_NAME }}}">
+    <meta name="twitter:description" content="{{{ PRODUCT_NAME }}} — a game by {{{ COMPANY_NAME }}}.">
+    <meta name="twitter:image" content="TemplateData/social-preview.png">
+
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
   </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <button id="unity-fullscreen-button" onclick="toggleFullscreen()"></button>
-      <canvas id="unity-canvas"></canvas>
+      <canvas id="unity-canvas" tabindex="-1">Your browser does not support the HTML canvas element.</canvas>
+      <button id="unity-fullscreen-button" type="button" title="Toggle fullscreen" aria-label="Toggle fullscreen"></button>
+      <a id="unity-audio-hint" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" title="Best played with headphones" aria-label="Best played with headphones"></a>
       <div id="unity-loading-bar">
-	  <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty" role="progressbar" aria-label="Loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="unity-progress-bar-full"></div>
         </div>
+        <div id="unity-loading-text">0%</div>
       </div>
-      <div id="unity-warning"> </div>
+      <div id="unity-warning" aria-live="polite"></div>
+      <button id="unity-start-overlay" type="button" hidden>Click to play</button>
     </div>
     <script>
       var container = document.querySelector("#unity-container");
       var canvas = document.querySelector("#unity-canvas");
       var loadingBar = document.querySelector("#unity-loading-bar");
+      var progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
       var progressBarFull = document.querySelector("#unity-progress-bar-full");
+      var loadingText = document.querySelector("#unity-loading-text");
       var fullscreenButton = document.querySelector("#unity-fullscreen-button");
       var warningBanner = document.querySelector("#unity-warning");
-      
-      function isFullscreen()
-      {
-        return document.fullscreenElement !== null && document.fullscreenElement
-          || document.webkitFullscreenElement !== null && document.webkitFullscreenElement
-          || document.msFullscreenElement !== null && document.msFullscreenElement;
+      var startOverlay = document.querySelector("#unity-start-overlay");
+
+      function isFullscreen() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
       }
-      
-      function rebuildFullscreenGUI()
-      {
-        if (isFullscreen()) {
-          document.getElementById("unity-fullscreen-button").style.backgroundImage="url('TemplateData/fullscreen-button-in.png')";
-        }
-        else {
-          document.getElementById("unity-fullscreen-button").style.backgroundImage="url('TemplateData/fullscreen-button-out.png')";
-        }
+
+      function rebuildFullscreenGUI() {
+        fullscreenButton.classList.toggle("is-fullscreen", isFullscreen());
       }
-      
+
       function unityShowBanner(msg, type) {
         function updateBannerVisibility() {
           warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
         }
         var div = document.createElement('div');
-        div.innerHTML = msg;
+        div.textContent = msg;
+        if (type == 'error') div.className = 'unity-banner-error';
+        else if (type == 'warning') div.className = 'unity-banner-warning';
         warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
+        updateBannerVisibility();
+        if (type != 'error') {
+          setTimeout(function () {
+            if (div.parentNode) warningBanner.removeChild(div);
             updateBannerVisibility();
           }, 5000);
         }
-        updateBannerVisibility();
-      }
-      
-      function toggleFullscreen() {
-         if (isFullscreen()) {
-            if (document.exitFullscreen) {
-              document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-              document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-              document.msExitFullscreen();
-            } else {
-              alert("Full screen is not supported by this browser.");
-            }
-         }
-         else {
-           var element = document.getElementById("unity-container");
-            if (element.requestFullscreen) {
-              element.requestFullscreen();
-            } else if (element.webkitRequestFullscreen) {
-              element.webkitRequestFullscreen();
-            } else if (element.msRequestFullscreen) {
-              element.msRequestFullscreen();
-            } else {
-              alert("Full screen is not supported by this browser.");
-            }
-         }
       }
 
-      function confirmUnload(event) {
-        return confirm("All unsaved progress will be lost.");
+      function enterFullscreen() {
+        var request = container.requestFullscreen || container.webkitRequestFullscreen || container.msRequestFullscreen;
+        if (!request) {
+          unityShowBanner("Fullscreen is not supported by this browser.", "warning");
+          return;
+        }
+        Promise.resolve(request.call(container)).catch(function () { });
       }
-      
+
+      function exitFullscreen() {
+        var exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+        if (!exit) return;
+        Promise.resolve(exit.call(document)).catch(function () { });
+      }
+
+      function toggleFullscreen() {
+        if (isFullscreen()) exitFullscreen();
+        else enterFullscreen();
+      }
+
+      // Browsers keep the audio context suspended until the player interacts with the page,
+      // so the game starts behind an overlay that guarantees that first gesture.
+      function showStartOverlay(unityInstance) {
+        if (window.matchMedia("(pointer: coarse)").matches) startOverlay.textContent = "Tap to play";
+        startOverlay.hidden = false;
+        startOverlay.focus();
+        startOverlay.addEventListener("click", function () {
+          startOverlay.hidden = true;
+          try {
+            var webAudio = unityInstance.Module && unityInstance.Module.WEBAudio;
+            var audioContext = webAudio && webAudio.audioContext;
+            if (audioContext && audioContext.state === "suspended") audioContext.resume();
+          } catch (e) { }
+          canvas.focus();
+        }, { once: true });
+      }
+
+      fullscreenButton.addEventListener("click", toggleFullscreen);
+      document.addEventListener("fullscreenchange", rebuildFullscreenGUI);
+      document.addEventListener("webkitfullscreenchange", rebuildFullscreenGUI);
+      document.addEventListener("MSFullscreenChange", rebuildFullscreenGUI);
+
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/{{{ LOADER_FILENAME }}}";
       var config = {
@@ -112,52 +134,52 @@
         productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
         showBanner: unityShowBanner,
       };
-      
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
+
+      // Set this to false to size the canvas DOM element and the WebGL render
+      // target yourself instead of letting Unity keep them in sync.
       //config.matchWebGLToCanvasSize = false;
-      
+
       if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
         // Mobile device style: fill the whole browser client area with the game canvas
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
         container.className = "unity-mobile";
-      
+
         // To lower canvas resolution on mobile devices to gain some
         // performance, uncomment the following line:
         //config.devicePixelRatio = 1;
-      
-        unityShowBanner('WebGL builds are not supported on mobile devices.');
       }
-      
+
       #if BACKGROUND_FILENAME
       canvas.style.background = "url('" + buildUrl + "/{{{ BACKGROUND_FILENAME.replace(/'/g, '%27') }}}') center / cover";
       #endif
       loadingBar.style.display = "block";
-      
+
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
         createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
+          var percent = Math.round(progress * 100);
+          progressBarFull.style.width = percent + "%";
+          progressBarEmpty.setAttribute("aria-valuenow", percent);
+          loadingText.textContent = percent + "%";
         }).then((unityInstance) => {
           loadingBar.style.display = "none";
+          showStartOverlay(unityInstance);
 
-          // If you want to warn the player before they close the tab,
-          // uncomment the following:
-          //window.onbeforeunload = confirmUnload;
+          // If you want to warn the player before they close the tab, uncomment:
+          //window.addEventListener("beforeunload", (event) => {
+          //  event.preventDefault();
+          //  event.returnValue = "";
+          //});
         }).catch((message) => {
-          alert(message);
+          loadingBar.style.display = "none";
+          unityShowBanner(message, "error");
         });
       };
+      script.onerror = () => {
+        loadingBar.style.display = "none";
+        unityShowBanner("Failed to load " + loaderUrl + ". Check that the Build folder was uploaded next to index.html, and that your server sends compressed files (.br / .gz) with the matching Content-Encoding header.", "error");
+      };
       document.body.appendChild(script);
-      
-      document.onfullscreenchange = rebuildFullscreenGUI;
     </script>
   </body>
 </html>
