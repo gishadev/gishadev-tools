@@ -1,3 +1,26 @@
+## [1.7.0] - 2026-31-07
+### Fixed
+- `MenuController.PopPage(PopupPage)` called `Stack<T>.Pop(page)`, which doesn't exist — the UI namespace didn't compile. The page stack is now backed by a `List<PopupPage>` so a page can be removed from any position, not just the top
+- `PopPage()` popped the stack itself and then passed the page to `PopPage(PopupPage)`, which popped again — two pages disappeared per call
+- `PopAllPages` incremented its index while `Count` shrank, so it stopped halfway and left roughly half the stack open
+- Clicking during a transition could softlock the menu: the exit sequence's `OnComplete` unconditionally deactivated its page, so a page re-entered while its old exit was still running got deactivated by that stale callback — stack says a page is open, nothing on screen. Transitions now cancel the running sequence before starting a new one (PrimeTween's `Stop()` skips callbacks), and the enter path restores alpha/position/scale itself instead of relying on the exit completing
+- An exiting page kept receiving clicks for the whole transition. `blocksRaycasts` is now off while a page exits and restored to its previous value afterwards
+- Pages destroyed while still in the stack left dangling entries; `PopupPage.OnDestroy` now tells its menu to drop it, without running exit transitions on a dead object
+- `ExitOnNewPagePush` was ignored on a single-page stack — the old page stayed visible under the new one, because the push routed through the guard that keeps the stack non-empty
+- Pushing the same page twice ran `Enter()` and `Exit()` back to back on it, firing both transitions and two `Changed` events
+- Slide transitions set their start value on `localPosition` but animated `anchoredPosition`; on pages with stretched anchors the start was effectively ignored. Both now use `anchoredPosition`
+- Null/`EventSystem.current` guards in `PushPage`, `IsPageInStack`, `IsPageOnTopOfStack` and `Start`
+
+### Changed
+- `MenuController.OnCancel` was dead code — Unity delivers that message only to the selected GameObject, never to the controller. Replaced by a public `Cancel()`, which you call from whatever input layer you use; the package stays input-system agnostic
+- `PopupPage.Pop()` no longer does `FindAnyObjectByType<MenuController>()`. Each page holds the `MenuController` that pushed it, so `Pop()` removes *that* page from *its* menu instead of blind-popping the top of an arbitrary controller
+- `PopPage(PopupPage)` stays `void` (UnityEvents only bind void methods); the `bool`-returning `TryPopPage(PopupPage)` is the new virtual override point. Subclasses overriding `PopPage(PopupPage)` need to move to `TryPopPage`
+- A page is only ever in the stack once — re-pushing a buried page moves it to the top
+
+### Added
+- `MenuController.CurrentPage`, `PageCount`, `IsActive` and a `StackChanged` event, so UI can react to the stack without polling
+- `PopupPage.MenuController` and `PopupPage.IsTransitioning`
+
 ## [1.6.0] - 2026-27-07
 ### Added
 - `Timer` (`gishadev.tools.Timers`) — UniTask-backed delays: `Timer.After(2f, action)` and `Timer.Every(0.5f, action)`, both returning a `TimerHandle` you can `Cancel()`. Overloads taking the calling `Component` link the timer to its lifetime, so callbacks stop when the object is destroyed instead of running against a dead GameObject. `ignoreTimeScale: true` keeps a timer running while the game is paused. Kept in its own namespace so importing `gishadev.tools.Core` doesn't pull a type called `Timer` into scope

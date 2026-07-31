@@ -6,7 +6,7 @@ namespace gishadev.tools.UI
 {
     public class PageTransitionProcessor
     {
-        private readonly Page _page;
+        private readonly PopupPage _popupPage;
 
         private readonly float _slideDuration = 1f;
         private readonly float _fadeDuration = 0.6f;
@@ -15,75 +15,136 @@ namespace gishadev.tools.UI
         private readonly RectTransform _rectTransform;
         private readonly CanvasGroup _canvasGroup;
 
-        public PageTransitionProcessor(Page page)
-        {
-            _page = page;
+        private Sequence _currentSequence;
+        private bool _raycastsBlocked;
+        private bool _raycastsBlockedValue;
 
-            _rectTransform = page.GetComponent<RectTransform>();
-            _canvasGroup = page.gameObject.GetOrAddComponent<CanvasGroup>();
+        public bool IsTransitioning => _currentSequence.isAlive;
+
+        public PageTransitionProcessor(PopupPage popupPage)
+        {
+            _popupPage = popupPage;
+
+            _rectTransform = popupPage.GetComponent<RectTransform>();
+            _canvasGroup = popupPage.gameObject.GetOrAddComponent<CanvasGroup>();
         }
 
         public void DoEnterTransition()
         {
-            _page.gameObject.SetActive(true);
-            switch (_page.EnterTransition)
+            StopCurrentTransition();
+
+            _popupPage.gameObject.SetActive(true);
+            ResetVisualState();
+
+            switch (_popupPage.EnterTransition)
             {
                 case PageTransitionType.None:
                 default:
                     return;
 
                 case PageTransitionType.SideSlide:
-                    SideSlideTransitionEffect(-Screen.width, 0f, _slideDuration, Ease.OutElastic);
+                    _currentSequence = SideSlideTransitionEffect(-Screen.width, 0f, _slideDuration, Ease.OutElastic);
                     break;
 
                 case PageTransitionType.VerticalSlide:
-                    VerticalSlideTransitionEffect(Screen.height, 0f, _slideDuration, Ease.OutElastic);
+                    _currentSequence = VerticalSlideTransitionEffect(Screen.height, 0f, _slideDuration, Ease.OutElastic);
                     break;
 
                 case PageTransitionType.Fade:
-                    FadeTransitionEffect(0f, 1f, _fadeDuration);
+                    _currentSequence = FadeTransitionEffect(0f, 1f, _fadeDuration);
                     break;
 
                 case PageTransitionType.Scale:
-                    ScaleTransitionEffect(0f, 1f, _scaleDuration, Ease.OutElastic);
+                    _currentSequence = ScaleTransitionEffect(0f, 1f, _scaleDuration, Ease.OutElastic);
                     break;
             }
         }
 
         public void DoExitTransition()
         {
-            Sequence seq = Sequence.Create();
-            switch (_page.ExitTransition)
-            {
-                case PageTransitionType.None:
-                default:
-                    _page.gameObject.SetActive(false);
-                    return;
+            StopCurrentTransition();
 
+            if (_popupPage.ExitTransition == PageTransitionType.None)
+            {
+                FinishExit();
+                return;
+            }
+
+            // The page is leaving, so it must stop taking clicks right away.
+            BlockRaycasts();
+
+            switch (_popupPage.ExitTransition)
+            {
                 case PageTransitionType.SideSlide:
-                    seq = SideSlideTransitionEffect(0f, Screen.width, _slideDuration, Ease.InOutQuint);
+                    _currentSequence = SideSlideTransitionEffect(0f, Screen.width, _slideDuration, Ease.InOutQuint);
                     break;
 
                 case PageTransitionType.VerticalSlide:
-                    seq = VerticalSlideTransitionEffect(0f, -Screen.height, _slideDuration, Ease.InOutQuint);
+                    _currentSequence = VerticalSlideTransitionEffect(0f, -Screen.height, _slideDuration, Ease.InOutQuint);
                     break;
 
                 case PageTransitionType.Fade:
-                    seq = FadeTransitionEffect(1f, 0f, _fadeDuration, Ease.OutSine);
+                    _currentSequence = FadeTransitionEffect(1f, 0f, _fadeDuration, Ease.OutSine);
                     break;
 
                 case PageTransitionType.Scale:
-                    seq = ScaleTransitionEffect(1f, 0f, _scaleDuration, Ease.InOutQuint);
+                    _currentSequence = ScaleTransitionEffect(1f, 0f, _scaleDuration, Ease.InOutQuint);
                     break;
             }
 
-            seq.OnComplete(() =>
-            {
-                _page.gameObject.SetActive(false);
-                _canvasGroup.alpha = 1f;
-                _rectTransform.localPosition = Vector3.zero;
-                _rectTransform.transform.localScale = Vector3.one;
-            });
+            _currentSequence.OnComplete(this, processor => processor.FinishExit(), warnIfTargetDestroyed: false);
+        }
+
+        /// <summary>
+        /// Kills the running transition without firing its callbacks, so a stale exit can never
+        /// deactivate a page that has since been re-entered.
+        /// </summary>
+        public void StopCurrentTransition()
+        {
+            if (_currentSequence.isAlive)
+                _currentSequence.Stop();
+
+            _currentSequence = default;
+            RestoreRaycasts();
+        }
+
+        private void FinishExit()
+        {
+            _currentSequence = default;
+
+            if (_popupPage == null)
+                return;
+
+            RestoreRaycasts();
+
+            _popupPage.gameObject.SetActive(false);
+            ResetVisualState();
+        }
+
+        private void ResetVisualState()
+        {
+            _canvasGroup.alpha = 1f;
+            _rectTransform.anchoredPosition = Vector2.zero;
+            _rectTransform.localScale = Vector3.one;
+        }
+
+        private void BlockRaycasts()
+        {
+            if (_raycastsBlocked)
+                return;
+
+            _raycastsBlockedValue = _canvasGroup.blocksRaycasts;
+            _canvasGroup.blocksRaycasts = false;
+            _raycastsBlocked = true;
+        }
+
+        private void RestoreRaycasts()
+        {
+            if (!_raycastsBlocked)
+                return;
+
+            _canvasGroup.blocksRaycasts = _raycastsBlockedValue;
+            _raycastsBlocked = false;
         }
 
         #region Transition Effects
@@ -91,10 +152,10 @@ namespace gishadev.tools.UI
         private Sequence SideSlideTransitionEffect(float startValue, float endValue, float duration,
             Ease ease = Ease.InSine)
         {
-            _rectTransform.localPosition = Vector3.right * startValue;
+            _rectTransform.anchoredPosition = Vector2.right * startValue;
 
             var seq = Sequence.Create(sequenceEase: ease, useUnscaledTime: true);
-            seq.Chain(Tween.UIAnchoredPosition(_rectTransform, Vector3.right * endValue, duration));
+            seq.Chain(Tween.UIAnchoredPosition(_rectTransform, Vector2.right * endValue, duration));
 
             return seq;
         }
@@ -102,10 +163,10 @@ namespace gishadev.tools.UI
         private Sequence VerticalSlideTransitionEffect(float startValue, float endValue, float duration,
             Ease ease = Ease.InSine)
         {
-            _rectTransform.localPosition = Vector3.up * startValue;
+            _rectTransform.anchoredPosition = Vector2.up * startValue;
 
             var seq = Sequence.Create(sequenceEase: ease, useUnscaledTime: true);
-            seq.Chain(Tween.UIAnchoredPosition(_rectTransform, Vector3.up * endValue, duration));
+            seq.Chain(Tween.UIAnchoredPosition(_rectTransform, Vector2.up * endValue, duration));
 
             return seq;
         }
@@ -124,7 +185,7 @@ namespace gishadev.tools.UI
         private Sequence ScaleTransitionEffect(float startValue, float endValue, float duration,
             Ease ease = Ease.InSine)
         {
-            _rectTransform.transform.localScale = Vector3.one * startValue;
+            _rectTransform.localScale = Vector3.one * startValue;
 
             var seq = Sequence.Create(sequenceEase: ease, useUnscaledTime: true);
             seq.Chain(Tween.Scale(_rectTransform.transform, endValue, duration));

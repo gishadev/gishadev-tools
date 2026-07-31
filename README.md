@@ -23,7 +23,7 @@ Or drop it in as a git submodule under `Assets/`.
 - **StateMachine** — a lightweight state machine (`IState` + `StateMachine`)
 - **Timers** — `Timer.After(2f, …)` / `Timer.Every(0.5f, …)`; pass the calling component to tie a timer to its lifetime, or cancel it via the returned handle
 - **SceneLoading** — `SceneLoader` for async scene loads with an optional fade; `ScreenFader` is a standalone fade-overlay you can use on its own
-- **UI** — `Page`/`PageTransitionProcessor` and UI event broadcasters (button/slider/toggle/input-field → typed events)
+- **UI** — `MenuController` drives a stack of `PopupPage`s (push, pop any page in the stack, pop all) with slide/fade/scale transitions; call `Cancel()` from your own input layer for back-button behaviour. Plus UI event broadcasters (button/slider/toggle/input-field → typed events)
 - **Extensions** — small, general-purpose extensions (`GetOrAddComponent`, `GetRandomElement`, `DestroyChildren`, `WithAlpha`, `With(x,y,z)` for vectors, etc.)
 - **Infrastructure** — `GishadevToolsLifetimeScope`, a VContainer lifetime scope wiring up the above
 - **Editor tooling** — `AudioEditor`, `PoolEditor` and a code generator that turns your `PoolDataSO`/`AudioMasterSO` entries into strongly-typed enums, so you call `EmitAt(SFXPoolEnum.EXPLOSION, pos)` instead of passing raw indices (see [`unity-setup`](https://github.com/gishadev/unity-setup), which scaffolds all of this into a new project)
