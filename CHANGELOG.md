@@ -1,3 +1,17 @@
+## [1.8.0] - 2026-04-08
+### Added — SavingSystem
+- `LocalPrefs`, a `PlayerPrefs` replacement that also stores `Vector2/3/4` and writes to a file under `persistentDataPath` you can move, back up or delete. Same call shape as before: `LocalPrefs.SetInt("highscore", 42)` / `LocalPrefs.Save()`
+- `LocalPrefsStore` for save slots — one instance per file, fully independent of every other. The static `LocalPrefs` is a thin facade over a shared default store, so casual use needs no wiring and slot-based games aren't forced through a singleton
+- Reads never create keys. `GetInt("score")` on a fresh save returns the default and leaves `HasKey("score")` false, instead of silently writing the default into the file
+- Saves are atomic: the payload goes to a temp file and swaps in via `File.Replace`, keeping one generation of backup. A crash or power loss mid-write leaves the previous save intact, and an interrupted swap is recovered from the backup on next load
+- A load failure can't poison the session. A truncated, corrupt or wrong-key file logs a `LoadFailed`, starts empty, and stays fully usable for subsequent reads, writes and saves
+- Optional encryption via `AesEncryptor` — AES-256-CBC with a fresh IV per save and an HMAC-SHA256 tag, so tampering and corruption are detected rather than loaded as garbage. Documented as obfuscation, not security: the passphrase ships in the build. Pass your own to the constructor instead of sharing the default
+- Save format is identified by a file header, not by the file name, so encrypted and plain saves share one path and toggling encryption just changes what the next save writes
+- `ISaverSystem` (`FileSaverSystem` / `PlayerPrefsSaverSystem` / `WebSaverSystem`) for systems that persist their own JSON blobs. The contract is now explicit and identical across all three: `Load` returns `null` for an unset key, reads don't create keys, and `Delete`/`ClearAll` persist like `Save` does
+- `FileSaverSystem` takes an `autoFlush: false` option plus an explicit `Flush()`, so writing many keys at once doesn't reserialize the whole file per key
+- `WebSaverSystem`'s JavaScript side now ships with the package as `Runtime/Plugins/WebGL/GishadevToolsStorage.jslib` — no per-project copy, unlike the WebGL template. Exports are prefixed `GishadevTools_*` so they can't collide with another package's `.jslib` at link time, and localStorage keys are namespaced so `ClearAll` only clears this game's entries when several games share an origin
+- `WebGLFileSystem.Sync()` flushes `persistentDataPath` writes to IndexedDB on WebGL, so file saves survive a page reload. A no-op elsewhere, and called automatically after every save
+
 ## [1.7.0] - 2026-31-07
 ### Fixed
 - `MenuController.PopPage(PopupPage)` called `Stack<T>.Pop(page)`, which doesn't exist — the UI namespace didn't compile. The page stack is now backed by a `List<PopupPage>` so a page can be removed from any position, not just the top
