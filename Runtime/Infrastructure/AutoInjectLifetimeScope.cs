@@ -9,6 +9,12 @@ using VContainer.Unity;
 
 namespace gishadev.tools.Infrastructure
 {
+    /// <summary>
+    /// A <see cref="LifetimeScope"/> that injects every scene component with an [Inject] member.
+    /// Subclasses overriding <see cref="Configure"/> must call <c>base.Configure(builder)</c> —
+    /// the sweep runs as a build callback registered there, because a scope whose parent hasn't
+    /// spawned yet defers its build and has no container during Awake.
+    /// </summary>
     public abstract class AutoInjectLifetimeScope : LifetimeScope
     {
         [SerializeField] private bool autoInjectScene = true;
@@ -20,12 +26,25 @@ namespace gishadev.tools.Infrastructure
 
         private static readonly Dictionary<Type, bool> InjectAttributeCache = new();
 
+        private bool _initialSweepDone;
+
+        protected override void Configure(IContainerBuilder builder)
+        {
+            base.Configure(builder);
+
+            if (autoInjectScene)
+                builder.RegisterBuildCallback(InjectAllSceneObjects);
+        }
+
         protected override void Awake()
         {
             base.Awake();
 
-            if (autoInjectScene)
-                InjectAllSceneObjects();
+            // The sweep normally runs from the build callback above. This only covers a subclass
+            // that overrode Configure without calling base — and only when the container already
+            // exists, since a deferred scope has none yet.
+            if (autoInjectScene && !_initialSweepDone && Container != null)
+                InjectAllSceneObjects(Container);
 
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
@@ -38,16 +57,18 @@ namespace gishadev.tools.Infrastructure
             SceneManager.sceneUnloaded -= OnSceneUnloaded;
         }
 
-        private void InjectAllSceneObjects()
+        private void InjectAllSceneObjects(IObjectResolver resolver)
         {
+            _initialSweepDone = true;
+
             var injectables = FindObjectsByType(typeof(MonoBehaviour), includeInactive, FindObjectsSortMode.None)
                 .Select(x => (MonoBehaviour)x)
                 .Where(HasInjectAttribute);
 
-            Inject(injectables);
+            Inject(injectables, resolver);
         }
 
-        private void InjectSceneObjects(Scene scene)
+        private void InjectSceneObjects(Scene scene, IObjectResolver resolver)
         {
             bool inactive = includeInactive == FindObjectsInactive.Include;
 
@@ -55,17 +76,17 @@ namespace gishadev.tools.Infrastructure
                 .SelectMany(root => root.GetComponentsInChildren<MonoBehaviour>(inactive))
                 .Where(HasInjectAttribute);
 
-            Inject(injectables);
+            Inject(injectables, resolver);
         }
 
-        private void Inject(IEnumerable<MonoBehaviour> injectables)
+        private void Inject(IEnumerable<MonoBehaviour> injectables, IObjectResolver resolver)
         {
             int count = 0;
             foreach (var injectable in injectables)
             {
                 try
                 {
-                    Container.Inject(injectable);
+                    resolver.Inject(injectable);
                     count++;
                 }
                 catch (VContainerException ex)
@@ -110,8 +131,10 @@ namespace gishadev.tools.Infrastructure
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (autoInjectScene)
-                InjectSceneObjects(scene);
+            // Container is still null if this scope's build is queued behind a parent that
+            // hasn't spawned; the build callback sweeps every loaded scene once it does.
+            if (autoInjectScene && Container != null)
+                InjectSceneObjects(scene, Container);
         }
 
         private void OnSceneUnloaded(Scene arg0)
