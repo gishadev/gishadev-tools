@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using VContainer;
@@ -11,12 +13,20 @@ namespace gishadev.tools.Infrastructure
     {
         [SerializeField] private bool autoInjectScene = true;
         [SerializeField] private FindObjectsInactive includeInactive = FindObjectsInactive.Include;
+        [SerializeField] private bool verboseLogging;
+
+        private const BindingFlags MemberFlags =
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+        private static readonly Dictionary<Type, bool> InjectAttributeCache = new();
 
         protected override void Awake()
         {
             base.Awake();
-            InjectAllSceneObjects();
-            
+
+            if (autoInjectScene)
+                InjectAllSceneObjects();
+
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.sceneUnloaded += OnSceneUnloaded;
         }
@@ -30,11 +40,26 @@ namespace gishadev.tools.Infrastructure
 
         private void InjectAllSceneObjects()
         {
-            // Find all scene objects with [Inject] attributes and inject them
             var injectables = FindObjectsByType(typeof(MonoBehaviour), includeInactive, FindObjectsSortMode.None)
                 .Select(x => (MonoBehaviour)x)
                 .Where(HasInjectAttribute);
 
+            Inject(injectables);
+        }
+
+        private void InjectSceneObjects(Scene scene)
+        {
+            bool inactive = includeInactive == FindObjectsInactive.Include;
+
+            var injectables = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<MonoBehaviour>(inactive))
+                .Where(HasInjectAttribute);
+
+            Inject(injectables);
+        }
+
+        private void Inject(IEnumerable<MonoBehaviour> injectables)
+        {
             int count = 0;
             foreach (var injectable in injectables)
             {
@@ -43,51 +68,50 @@ namespace gishadev.tools.Infrastructure
                     Container.Inject(injectable);
                     count++;
                 }
+                catch (VContainerException ex)
+                {
+                    // Expected when nested: the dependency lives in a child container, which a parent
+                    // can't see. The child scope's own sweep resolves it, so this one steps aside.
+                    if (verboseLogging)
+                        Debug.LogWarning($"Skipped {injectable.GetType().Name} on {injectable.gameObject.name}: " +
+                                         $"{ex.InvalidType} is not registered in this scope.", injectable);
+                }
                 catch (Exception ex)
                 {
-                    Debug.LogError(
-                        $"Failed to inject {injectable.GetType()} on {injectable.gameObject.name}: {ex.Message}");
+                    Debug.LogError($"Failed to inject {injectable.GetType().Name} on {injectable.gameObject.name}: {ex}",
+                        injectable);
                 }
             }
 
-            Debug.Log($"Auto-injected {count} scene components");
+            if (verboseLogging)
+                Debug.Log($"Auto-injected {count} scene components", this);
         }
-
 
         // Helper method to check if a MonoBehaviour has any [Inject] fields/properties/methods
-        private bool HasInjectAttribute(MonoBehaviour mb)
+        private static bool HasInjectAttribute(MonoBehaviour mb)
         {
+            if (mb == null)
+                return false;
+
             var type = mb.GetType();
+            if (InjectAttributeCache.TryGetValue(type, out bool cached))
+                return cached;
 
-            // Check if any fields have [Inject]
-            var hasInjectFields = type.GetFields(System.Reflection.BindingFlags.Instance |
-                                                 System.Reflection.BindingFlags.Public |
-                                                 System.Reflection.BindingFlags.NonPublic)
-                .Any(field => field.GetCustomAttributes(typeof(InjectAttribute), true).Length > 0);
+            bool hasInject = type.GetFields(MemberFlags).Any(HasInjectAttribute) ||
+                             type.GetProperties(MemberFlags).Any(HasInjectAttribute) ||
+                             type.GetMethods(MemberFlags).Any(HasInjectAttribute);
 
-            if (hasInjectFields) return true;
-
-            // Check if any properties have [Inject]
-            var hasInjectProperties = type.GetProperties(System.Reflection.BindingFlags.Instance |
-                                                         System.Reflection.BindingFlags.Public |
-                                                         System.Reflection.BindingFlags.NonPublic)
-                .Any(prop => prop.GetCustomAttributes(typeof(InjectAttribute), true).Length > 0);
-
-            if (hasInjectProperties) return true;
-
-            // Check if any methods have [Inject]
-            var hasInjectMethods = type.GetMethods(System.Reflection.BindingFlags.Instance |
-                                                   System.Reflection.BindingFlags.Public |
-                                                   System.Reflection.BindingFlags.NonPublic)
-                .Any(method => method.GetCustomAttributes(typeof(InjectAttribute), true).Length > 0);
-
-            return hasInjectMethods;
+            InjectAttributeCache[type] = hasInject;
+            return hasInject;
         }
 
-        private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
+        private static bool HasInjectAttribute(MemberInfo member) =>
+            member.GetCustomAttributes(typeof(InjectAttribute), true).Length > 0;
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             if (autoInjectScene)
-                InjectAllSceneObjects();
+                InjectSceneObjects(scene);
         }
 
         private void OnSceneUnloaded(Scene arg0)

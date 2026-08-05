@@ -35,6 +35,14 @@
 - `MenuController.CurrentPage`, `PageCount`, `IsActive` and a `StackChanged` event, so UI can react to the stack without polling
 - `PopupPage.MenuController` and `PopupPage.IsTransitioning`
 
+### AutoInjectLifetimeScope
+- **Behaviour change:** `Awake` ran the scene sweep unconditionally, so `autoInjectScene` only ever suppressed the re-runs on scene load — the sweep could not actually be turned off. `Awake` now respects the flag. If you unchecked it and still relied on the startup sweep, it no longer runs; the field defaults to `true`, so most setups are unaffected
+- That fix is what makes the class usable as a VContainer **root** scope alongside child scopes: turn the sweep off on the root and let a child scope do it. A child container resolves its own registrations and its parent's, so it can inject everything the root can and more, while a parent can never see a child's registrations
+- A component whose dependencies live in a child container is expected in a nested setup, not a fault, but each one logged a `Debug.LogError` on every scene load. `VContainerException` is now skipped silently — or logged as a warning naming the unresolvable type when the new `verboseLogging` flag is on — while genuine failures still log as errors. Both pass the component as log context so clicking the entry pings the object, and log the full exception rather than just `ex.Message`
+- `OnSceneLoaded` re-swept every loaded scene on additive loads, re-injecting components that were already done; it now sweeps only the newly loaded scene's roots
+- `HasInjectAttribute` ran three full reflection passes per component with no memoization; results are now cached per `Type`. Components with a missing script no longer throw during the sweep
+- The "Auto-injected N scene components" log fired on every scene load; it's now behind `verboseLogging` (off by default)
+
 ### Modern WebGL template
 - Removed the "WebGL builds are not supported on mobile devices" banner inherited from Unity's stock template — it isn't true, and every phone player was seeing it over the game
 - Mobile touch fixes: `touch-action: none` (the browser was eating drags as scroll/pinch-zoom), `user-select: none`, no tap highlight, `overflow: hidden`, and a static viewport meta with `viewport-fit=cover` instead of one injected by user-agent sniffing
