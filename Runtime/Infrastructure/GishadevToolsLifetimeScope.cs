@@ -20,7 +20,7 @@ namespace gishadev.tools.Infrastructure
             builder.RegisterInstance(audioMasterSO);
             builder.RegisterInstance(poolDataSO);
 
-            builder.Register<IEventBus>(Lifetime.Singleton).AsImplementedInterfaces();
+            builder.Register<EventBus>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<AudioManager>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<SFXEmitter>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<VFXEmitter>(Lifetime.Singleton).AsImplementedInterfaces();
