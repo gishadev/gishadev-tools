@@ -1,3 +1,4 @@
+using gishadev.lumbersim.EventsManager;
 using gishadev.tools.Audio;
 using gishadev.tools.Effects;
 using gishadev.tools.Pooling;
@@ -19,6 +20,7 @@ namespace gishadev.tools.Infrastructure
             builder.RegisterInstance(audioMasterSO);
             builder.RegisterInstance(poolDataSO);
 
+            builder.Register<IEventBus>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<AudioManager>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<SFXEmitter>(Lifetime.Singleton).AsImplementedInterfaces();
             builder.Register<VFXEmitter>(Lifetime.Singleton).AsImplementedInterfaces();
