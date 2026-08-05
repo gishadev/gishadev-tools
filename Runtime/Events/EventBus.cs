@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace gishadev.lumbersim.EventsManager
+namespace gishadev.tools.Events
 {
     public class EventBus : IEventBus
     {

@@ -1,6 +1,6 @@
 using System;
 
-namespace gishadev.lumbersim.EventsManager
+namespace gishadev.tools.Events
 {
     public interface IEventBus
     {

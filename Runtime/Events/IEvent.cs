@@ -1,4 +1,4 @@
-namespace gishadev.lumbersim.EventsManager
+namespace gishadev.tools.Events
 {
     public interface IEvent
     {
