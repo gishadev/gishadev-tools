@@ -6,6 +6,10 @@ namespace gishadev.tools.Effects
 {
     public class OtherEmitter : PoolManager<OtherPoolObject>, IOtherEmitter
     {
+        public OtherEmitter(PoolDataSO poolDataSO) : base(poolDataSO)
+        {
+        }
+
         protected override Transform Parent { get; set; }
         protected override IReadOnlyList<OtherPoolObject> PoolObjectsCollection => PoolDataSO.OtherPoolObjects;
 

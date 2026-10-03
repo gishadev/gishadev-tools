@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using VContainer;
 using VContainer.Unity;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
@@ -11,7 +10,7 @@ namespace gishadev.tools.Pooling
 {
     public abstract class PoolManager<T> : IInitializable, IDisposable where T : PoolObject
     {
-        [Inject] protected PoolDataSO PoolDataSO { get; set; }
+        protected PoolDataSO PoolDataSO { get; }
 
         private readonly Dictionary<IPoolObject, List<GameObject>> _objectsByPoolObject = new();
         private readonly Dictionary<IPoolObject, Transform> _parentByPoolObject = new();
@@ -22,12 +21,17 @@ namespace gishadev.tools.Pooling
         // backing array from PoolDataSO directly rather than building a new collection.
         protected abstract IReadOnlyList<T> PoolObjectsCollection { get; }
 
+        protected PoolManager(PoolDataSO poolDataSO)
+        {
+            PoolDataSO = poolDataSO;
+        }
+
         public virtual void Initialize()
         {
             if (PoolDataSO == null)
             {
-                Debug.LogError(
-                    $"{GetType().Name}: no PoolDataSO injected. Assign one on your GishadevToolsLifetimeScope.");
+                Debug.LogError($"{GetType().Name}: no PoolDataSO given. Pass one to GishadevToolsInstaller " +
+                               "(or assign it on GishadevToolsLifetimeScope).");
                 return;
             }
 

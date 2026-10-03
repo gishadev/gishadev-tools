@@ -11,7 +11,7 @@ namespace gishadev.tools.Effects
         private readonly IAudioManager _audioManager;
         private readonly HashSet<AudioSource> _emittedSources = new();
 
-        public SFXEmitter(IAudioManager audioManager)
+        public SFXEmitter(PoolDataSO poolDataSO, IAudioManager audioManager) : base(poolDataSO)
         {
             _audioManager = audioManager;
         }

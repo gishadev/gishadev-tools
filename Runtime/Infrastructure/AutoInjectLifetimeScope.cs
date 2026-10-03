@@ -15,6 +15,7 @@ namespace gishadev.tools.Infrastructure
     /// the sweep runs as a build callback registered there, because a scope whose parent hasn't
     /// spawned yet defers its build and has no container during Awake.
     /// </summary>
+    [Obsolete("Use GishadevToolsInstaller in your own LifetimeScope and register MonoBehaviours explicitly.", false)]
     public abstract class AutoInjectLifetimeScope : LifetimeScope
     {
         [SerializeField] private bool autoInjectScene = true;

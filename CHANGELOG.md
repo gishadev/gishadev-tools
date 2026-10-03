@@ -1,3 +1,23 @@
+## [1.9.0] - 2026-03-10
+### Added — Installer-based integration
+- `GishadevToolsInstaller` (`VContainer.Unity.IInstaller`) registers the package's services into any scope, so a project with its own `LifetimeScope`s no longer has to put `GishadevToolsLifetimeScope` in the scene or copy its registrations: `new GishadevToolsInstaller(audioMasterSO, poolDataSO) { RegisterEventBus = false }.Install(builder);`
+- Per-module flags, all `true` by default: `RegisterEventBus` (turn off when the project registers its own `IEventBus`, instead of ending up with two buses), `RegisterAudio`, `RegisterEmitters`, `RegisterSceneLoader`
+- Inputs are validated at install time. An enabled module with a null `AudioMasterSO` / `PoolDataSO` throws an `InvalidOperationException` naming the missing asset and the flag that turns it off — previously the scope died on a bare `NullReferenceException` inside `RegisterInstance`. Disabled modules accept `null`
+- `GishadevToolsLifetimeScope` now just runs the installer, so there's one source of truth for registrations. It gained matching module toggles in the inspector (default on, so existing scenes are unchanged)
+- EditMode tests (`Tests/Editor`, `gishadev.tools.Tests`) covering resolution of every service, the `RegisterEventBus = false` path and the null-asset errors
+
+### Changed — Constructor injection
+- `AudioManager` takes its `AudioMasterSO` through the constructor instead of a private `[Inject]` field, so the dependency is visible and the class can be built without a container
+- `PoolManager<T>` takes its `PoolDataSO` through a protected constructor; `PoolDataSO` is now a read-only protected property. The emitters pass it through: `SFXEmitter(PoolDataSO, IAudioManager)`, `VFXEmitter(PoolDataSO)`, `OtherEmitter(PoolDataSO)`
+- **Migration:** a custom `PoolManager<T>` subclass needs a constructor that forwards the asset — `public MyEmitter(PoolDataSO poolDataSO) : base(poolDataSO) { }`. Code constructing `AudioManager` or the emitters by hand must pass the assets. Service interfaces are unchanged
+- `AudioManager` / `PoolManager` errors for a missing asset now point at `GishadevToolsInstaller` rather than only the scope
+
+### Fixed
+- `AudioManager` kept its `[Audio Parent]` in a `static` field shared by every instance. A second manager — another scope, or the next Play session with domain reload disabled — saw it, skipped `Init()` and ran with no players: silently broken audio. The parent is now per instance and destroyed in `Dispose`. A second manager still initializes but logs a warning to register audio once, in the root scope. The instance count behind that warning resets on `SubsystemRegistration`, so it doesn't leak across Play sessions
+
+### Deprecated
+- `AutoInjectLifetimeScope` is `[Obsolete]` (warning only). Its reflection sweep over every scene MonoBehaviour hides dependencies and misses runtime-spawned objects; use `GishadevToolsInstaller` in your own scope and register MonoBehaviours explicitly. `GishadevToolsLifetimeScope` keeps it as its base for now, so old setups behave exactly as before. Both stay until 2.0.0
+
 ## [1.8.0] - 2026-04-08
 ### Added — SavingSystem
 - `LocalPrefs`, a `PlayerPrefs` replacement that also stores `Vector2/3/4` and writes to a file under `persistentDataPath` you can move, back up or delete. Same call shape as before: `LocalPrefs.SetInt("highscore", 42)` / `LocalPrefs.Save()`

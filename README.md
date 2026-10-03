@@ -27,15 +27,69 @@ Or drop it in as a git submodule under `Assets/`.
 - **UI** — `MenuController` drives a stack of `PopupPage`s (push, pop any page in the stack, pop all) with slide/fade/scale transitions; call `Cancel()` from your own input layer for back-button behaviour. Plus UI event broadcasters (button/slider/toggle/input-field → typed events)
 - **WebGL** — a `Modern` build template (pick it in Player Settings → Resolution and Presentation): letterboxed 16:9 canvas, CSS loading bar, click-to-play overlay that unlocks browser audio, Open Graph tags for link previews, and a real error message when a build fails to load instead of a stuck progress bar. For a link-preview image, put a 1200x630 `TemplateData/social-preview.png` into the built output before uploading — when the package is installed under `Packages/` it's immutable, so copy the template into `Assets/WebGLTemplates` first if you want to customise it per project
 - **Extensions** — small, general-purpose extensions (`GetOrAddComponent`, `GetRandomElement`, `DestroyChildren`, `WithAlpha`, `With(x,y,z)` for vectors, etc.)
-- **Infrastructure** — `GishadevToolsLifetimeScope`, a VContainer lifetime scope wiring up the above
+- **Infrastructure** — `GishadevToolsInstaller`, a VContainer installer that registers the services above into any scope, plus `GishadevToolsLifetimeScope` as a drop-in quick start (see [Integration](#integration))
 - **Editor tooling** — `AudioEditor`, `PoolEditor` and a code generator that turns your `PoolDataSO`/`AudioMasterSO` entries into strongly-typed enums, so you call `EmitAt(SFXPoolEnum.EXPLOSION, pos)` instead of passing raw indices (see [`unity-setup`](https://github.com/gishadev/unity-setup), which scaffolds all of this into a new project)
+
+## Integration
+
+The package's services are app-lifetime — the audio players and emitter pools live under `DontDestroyOnLoad` objects and the pools reset on every scene load — so register them once, in your root/project scope.
+
+### Installer (recommended)
+
+Install `GishadevToolsInstaller` in your own `LifetimeScope`. Turn off any module you register yourself or don't use:
+
+```csharp
+public class ProjectLifetimeScope : LifetimeScope
+{
+    [SerializeField] private AudioMasterSO audioMasterSO;
+    [SerializeField] private PoolDataSO poolDataSO;
+
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.Register<IEventBus, EventBus>(Lifetime.Singleton);
+        new GishadevToolsInstaller(audioMasterSO, poolDataSO) { RegisterEventBus = false }.Install(builder);
+    }
+}
+
+public class HoseService
+{
+    private readonly ISFXEmitter _sfx;
+    public HoseService(ISFXEmitter sfx) => _sfx = sfx;
+    // _sfx.EmitAt(SFXPoolEnum.WATER_SPLASH, hit.point);
+}
+```
+
+| Flag | Registers | Needs |
+|---|---|---|
+| `RegisterEventBus` | `IEventBus` | — |
+| `RegisterAudio` | `IAudioManager` | `AudioMasterSO` |
+| `RegisterEmitters` | `ISFXEmitter`, `IVFXEmitter`, `IOtherEmitter` | `PoolDataSO`, plus an `IAudioManager` for the SFX emitter |
+| `RegisterSceneLoader` | `ISceneLoader` | — |
+
+All flags default to `true`. An enabled module with a null asset throws when the scope builds, naming the missing asset — pass `null` only for modules you've turned off. Nothing is injected by reflection: register your MonoBehaviours explicitly (`RegisterComponent`, `RegisterComponentInHierarchy`, …) and give them an `[Inject] public void Construct(...)` method.
+
+### Quick start: `GishadevToolsLifetimeScope`
+
+Put `GishadevToolsLifetimeScope` in your scene (or use it as a parent scope), assign the two assets, and untick any module you don't want. It runs the same installer, and also auto-injects every scene MonoBehaviour that has an `[Inject]` member.
+
+That auto-inject base, `AutoInjectLifetimeScope`, is deprecated: it scans scenes by reflection, hides dependencies and misses objects spawned at runtime. It still works and will be removed in 2.0.0 — prefer the installer for new projects.
 
 ## Usage
 
 ```csharp
-[Inject] private IAudioManager _audioManager;
-[Inject] private ISFXEmitter _sfxEmitter;
-[Inject] private ISceneLoader _sceneLoader;
+public class Player
+{
+    private readonly IAudioManager _audioManager;
+    private readonly ISFXEmitter _sfxEmitter;
+    private readonly ISceneLoader _sceneLoader;
+
+    public Player(IAudioManager audioManager, ISFXEmitter sfxEmitter, ISceneLoader sceneLoader)
+    {
+        _audioManager = audioManager;
+        _sfxEmitter = sfxEmitter;
+        _sceneLoader = sceneLoader;
+    }
+}
 
 _audioManager.PlayMusic(MusicAudioEnum.MUSIC_1);
 _sfxEmitter.EmitAt(SFXPoolEnum.EXPLOSION, hitPoint); // rotation defaults to identity
@@ -46,7 +100,7 @@ var loop = Timer.Every(0.5f, Spawn, this);
 loop.Cancel();
 ```
 
-Register `GishadevToolsLifetimeScope` in your scene (or as a parent scope) to get everything above injected.
+Writing your own pool on top of `PoolManager<T>`? Pass the `PoolDataSO` through its protected constructor: `public MyEmitter(PoolDataSO poolDataSO) : base(poolDataSO) { }`.
 
 ### Saving
 

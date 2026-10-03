@@ -4,7 +4,6 @@ using System.Threading;
 using Cysharp.Threading.Tasks;
 using gishadev.tools.Extensions;
 using UnityEngine;
-using VContainer;
 using VContainer.Unity;
 using Object = UnityEngine.Object;
 
@@ -12,14 +11,19 @@ namespace gishadev.tools.Audio
 {
     public class AudioManager : IAudioManager, IInitializable, IDisposable
     {
-        [Inject] private AudioMasterSO _audioMasterData;
+        private readonly AudioMasterSO _audioMasterData;
 
         public delegate void DelayedDelegate();
 
         public event Action<AudioData> AudioStarted;
         public event Action VolumeChanged;
 
-        private static GameObject _audioParent;
+        // Only used to warn about a second instance - see Initialize. Reset on SubsystemRegistration so
+        // it starts at zero every Play session, even with domain reload disabled.
+        private static int _initializedInstances;
+
+        private GameObject _audioParent;
+        private bool _isInitialized;
 
         private float _masterVolumePercentage = 1f;
         private float _musicVolumePercentage = 1f;
@@ -33,17 +37,31 @@ namespace gishadev.tools.Audio
         public float MusicVolumePercentage => _musicVolumePercentage;
         public float SFXVolumePercentage => _sfxVolumePercentage;
 
+        public AudioManager(AudioMasterSO audioMasterSO)
+        {
+            _audioMasterData = audioMasterSO;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => _initializedInstances = 0;
+
         public void Initialize()
         {
             if (_audioMasterData == null)
             {
-                Debug.LogError(
-                    "AudioManager: no AudioMasterSO injected. Assign one on your GishadevToolsLifetimeScope.");
+                Debug.LogError("AudioManager: no AudioMasterSO given. Pass one to GishadevToolsInstaller " +
+                               "(or assign it on GishadevToolsLifetimeScope).");
                 return;
             }
 
-            if (_audioParent != null)
+            if (_isInitialized)
                 return;
+
+            // Two managers each build their own players and play their own music on top of each other.
+            // Still initialize this one - skipping it would leave it silently without players.
+            if (_initializedInstances > 0)
+                Debug.LogWarning("AudioManager: another AudioManager is already running. Register audio once, " +
+                                 "in your root/project scope, or both will play.");
 
             Init();
         }
@@ -51,6 +69,17 @@ namespace gishadev.tools.Audio
         public void Dispose()
         {
             _cts?.Cancel();
+            _delayFuncCts?.Cancel();
+
+            if (!_isInitialized)
+                return;
+
+            _isInitialized = false;
+            _initializedInstances--;
+
+            if (_audioParent != null)
+                Object.Destroy(_audioParent);
+            _audioParent = null;
         }
 
         public void SetMasterVolume(float volumePercent)
@@ -112,6 +141,9 @@ namespace gishadev.tools.Audio
 
         private void Init()
         {
+            _isInitialized = true;
+            _initializedInstances++;
+
             _audioParent = new GameObject("[Audio Parent]");
             
             _delayFuncCts = new CancellationTokenSource();

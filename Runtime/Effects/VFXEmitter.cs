@@ -6,6 +6,10 @@ namespace gishadev.tools.Effects
 {
     public class VFXEmitter : PoolManager<VFXPoolObject>, IVFXEmitter
     {
+        public VFXEmitter(PoolDataSO poolDataSO) : base(poolDataSO)
+        {
+        }
+
         protected override Transform Parent { get; set; }
         protected override IReadOnlyList<VFXPoolObject> PoolObjectsCollection => PoolDataSO.VFXPoolObjects;
 
