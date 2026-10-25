@@ -1,4 +1,26 @@
-## [Unreleased]
+## [1.10.0] - 2026-10-25
+### Added — Looping SFX
+- `SFXLoop`: a looping sound that fades to the level you ask for (`SetPlaying(bool, level)`, `SetPitch`), follows the master/SFX volume and holds while SFX are paused. `Dispose()` or destroying its parent removes it
+- `ISFXEmitter.CreateLoop(index, parent)`: a 3D loop from a pool entry, with its clips and its prefab's AudioSource settings (range, mixer group). Not pooled, and `DisableSFXOnComplete` is switched off on it
+- `IAudioManager.CreateSFXLoop(index, parent)`: a 2D loop from the SFX bank (ambience beds)
+- `IAudioManager.IsSFXPaused` / `SetSFXPaused(bool)`: holds every loop, e.g. while the game is paused
+
+### Added — Sounds saved by name
+- `SFXPoolRef` / `SFXAudioRef`: serializable references to a pool or bank entry by name, with an inspector drop-down. A saved generated enum is a number, so adding, removing or reordering entries re-pointed it at another sound; a name keeps pointing at the same one. A name that no longer exists shows as missing in the inspector and logs a warning when played
+- `EmitAt` / `CreateLoop` / `PlaySFX` / `CreateSFXLoop` overloads taking those references (`SoundRefExtensions`), plus `ISFXEmitter.IndexOf(name)` and `IAudioManager.IndexOfSFX(name)`
+
+### Added — Physics sounds
+- `PhysicsSoundSource` (on a Rigidbody prop) and `PhysicsSoundService`: bumps scaled by impact speed, a loop that follows speed (volume and pitch), random squeaks while moving, and a clack when a hinged part swings shut. `SurfaceAudio` gives a surface its own bump. Register the service in the scope that owns the props, with the list of sources
+
+### Added — Profiler spike report
+- `Tools → gishadev → Analyze Profiler Capture...`: reads a saved Profiler capture and writes a text report of what runs in the spike frames
+
+### Changed
+- `ISFXEmitter.EmitAt` takes optional `volume` (0..1 on top of the prefab's) and `pitchJitter` (random pitch offset per play). The generated `SFXPoolEnum` overloads forward them; hit GENERATE ENUMS to update `GeneratedExtensionMethods`. Code implementing `ISFXEmitter` or `IAudioManager` itself needs the new members
+
+### Fixed
+- `DisableSFXOnComplete` waited `clip.length` in scaled time, so a pitched-down clip was cut off early and a paused game (timeScale 0) kept finished sounds alive. It now waits `clip.length / pitch` in real time
+
 ### Added — SFX Prep
 - `Tools → gishadev → SFX Prep` window (`Editor/SfxPrep`): sound list editor, processing runner, preview and export, moved in from Pig Washer
 - `Tools~/SfxPrep/sfx_prep.py` takes `--project-root`, `--config` and `--library-dir`, so it runs from the package against any project; `sfx_config.example.json` to start a new project from

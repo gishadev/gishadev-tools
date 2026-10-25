@@ -45,7 +45,8 @@ namespace gishadev.tools.Effects
             }
         }
 
-        public GameObject EmitAt(int index, Vector3 position, Quaternion? rotation = null)
+        public GameObject EmitAt(int index, Vector3 position, Quaternion? rotation = null, float volume = 1f,
+            float pitchJitter = 0f)
         {
             if (!TryInstantiate(index, out var obj))
                 return null;
@@ -69,7 +70,9 @@ namespace gishadev.tools.Effects
             }
 
             var baseVolume = obj.GetOrAddComponent<SFXBaseVolume>().GetBaseVolume(audioSource);
-            audioSource.volume = baseVolume * _audioManager.SFXVolumePercentage * _audioManager.MasterVolumePercentage;
+            audioSource.volume = baseVolume * Mathf.Clamp01(volume) * _audioManager.SFXVolumePercentage *
+                                 _audioManager.MasterVolumePercentage;
+            audioSource.pitch = 1f + (pitchJitter > 0f ? Random.Range(-pitchJitter, pitchJitter) : 0f);
 
             _emittedSources.Add(audioSource);
 
@@ -77,6 +80,39 @@ namespace gishadev.tools.Effects
             obj.GetOrAddComponent<DisableSFXOnComplete>().StartTimer();
 
             return obj;
+        }
+
+        public SFXLoop CreateLoop(int index, Transform parent = null)
+        {
+            var poolObjects = PoolObjectsCollection;
+            if (index < 0 || index >= poolObjects.Count)
+            {
+                Debug.LogError($"SFXEmitter: no pool entry at index {index} " +
+                               $"({poolObjects.Count} entries configured on {PoolDataSO?.name}).");
+                return null;
+            }
+
+            var poolObject = poolObjects[index];
+            var prefab = poolObject.GetPrefab();
+            var go = prefab != null ? Object.Instantiate(prefab, parent, false) : new GameObject();
+            if (prefab == null)
+                go.transform.SetParent(parent, false);
+            go.name = $"[Loop] {poolObject.Name}";
+
+            // A loop isn't a pooled one-shot: nothing may switch it off when its clip ends.
+            if (go.TryGetComponent(out DisableSFXOnComplete disableOnComplete))
+                disableOnComplete.enabled = false;
+
+            var source = go.GetOrAddComponent<AudioSource>();
+            var clip = poolObject.AudioClips.GetRandomElement();
+            if (clip != null)
+                source.clip = clip;
+            // Loops ride along with moving things (a tool in hand, a rolling cart): no doppler warble.
+            source.dopplerLevel = 0f;
+
+            var loop = go.AddComponent<SFXLoop>();
+            loop.Init(source, source.volume, _audioManager);
+            return loop;
         }
     }
 }

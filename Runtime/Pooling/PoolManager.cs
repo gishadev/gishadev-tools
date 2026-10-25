@@ -61,6 +61,19 @@ namespace gishadev.tools.Pooling
                 RegisterPoolObject(poolObjects[i]);
         }
 
+        /// <summary>Index of the pool entry with this name; -1 when there is none.</summary>
+        public int IndexOf(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return -1;
+
+            var poolObjects = PoolObjectsCollection;
+            for (int i = 0; i < poolObjects.Count; i++)
+                if (poolObjects[i] != null && poolObjects[i].Name == name)
+                    return i;
+            return -1;
+        }
+
         protected bool TryInstantiate(int index, out GameObject emittedObj)
         {
             emittedObj = null;

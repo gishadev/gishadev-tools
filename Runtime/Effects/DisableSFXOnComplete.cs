@@ -21,8 +21,10 @@ namespace gishadev.tools.Effects
 
         private IEnumerator DisableOnAudioComplete()
         {
+            // Real time and pitch-aware: audio plays on while timeScale is 0, and a pitched-down clip lasts longer.
             if (_audioSource.clip != null)
-                yield return new WaitForSeconds(_audioSource.clip.length);
+                yield return new WaitForSecondsRealtime(_audioSource.clip.length /
+                                                        Mathf.Max(Mathf.Abs(_audioSource.pitch), 0.01f));
 
             gameObject.SetActive(false);
         }

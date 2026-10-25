@@ -17,7 +17,7 @@ Or drop it in as a git submodule under `Assets/`.
 ## What's inside
 
 - **Audio** — `AudioManager` for music/SFX playback with master/music/SFX volume mixing, fades, and auto-sequencing
-- **Effects** — `SFXEmitter` / `VFXEmitter` / `OtherEmitter`: pooled prefab emitters, `EmitAt(index, position, rotation?)`
+- **Effects** — `SFXEmitter` / `VFXEmitter` / `OtherEmitter`: pooled prefab emitters, `EmitAt(index, position, rotation?)` (SFX also take `volume` and `pitchJitter`). `CreateLoop` / `CreateSFXLoop` make fading `SFXLoop`s from a pool or bank entry. `SFXPoolRef` / `SFXAudioRef` save a sound by name in serialized fields, so editing the pool never re-points them. `PhysicsSoundSource` + `PhysicsSoundService` give props bumps, rolling loops, squeaks and hinge clacks
 - **Pooling** — generic `PoolManager<T>` backing the emitters above; reuses inactive instances before instantiating new ones
 - **Events** — `EventChannelSO` (Bool/Float/Int/String/Vector variants) for ScriptableObject-based decoupled messaging
 - **StateMachine** — a lightweight state machine (`IState` + `StateMachine`)

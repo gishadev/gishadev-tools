@@ -28,6 +28,7 @@ namespace gishadev.tools.Audio
         private float _masterVolumePercentage = 1f;
         private float _musicVolumePercentage = 1f;
         private float _sfxVolumePercentage = 1f;
+        private bool _sfxPaused;
 
         private CancellationTokenSource _delayFuncCts;
         private CancellationTokenSource _cts;
@@ -36,6 +37,7 @@ namespace gishadev.tools.Audio
         public float MasterVolumePercentage => _masterVolumePercentage;
         public float MusicVolumePercentage => _musicVolumePercentage;
         public float SFXVolumePercentage => _sfxVolumePercentage;
+        public bool IsSFXPaused => _sfxPaused;
 
         public AudioManager(AudioMasterSO audioMasterSO)
         {
@@ -118,6 +120,45 @@ namespace gishadev.tools.Audio
         }
 
         public void PlaySFX(int index) => PlayAudio<SFXData>(index);
+
+        public void SetSFXPaused(bool paused) => _sfxPaused = paused;
+
+        public int IndexOfSFX(string name)
+        {
+            var collection = AudioMasterData != null ? AudioMasterData.SFXCollection : null;
+            if (collection == null || string.IsNullOrEmpty(name))
+                return -1;
+
+            for (int i = 0; i < collection.Length; i++)
+                if (collection[i].Name == name)
+                    return i;
+            return -1;
+        }
+
+        public SFXLoop CreateSFXLoop(int index, Transform parent = null)
+        {
+            var collection = AudioMasterData.SFXCollection;
+            if (index < 0 || index >= collection.Length)
+            {
+                Debug.LogError($"AudioManager: no SFXData at index {index} " +
+                               $"({collection.Length} entries configured on {_audioMasterData.name}).");
+                return null;
+            }
+
+            var data = collection[index];
+            var go = new GameObject($"[Loop] {data.Name}");
+            go.transform.SetParent(parent, false);
+
+            var source = go.AddComponent<AudioSource>();
+            source.spatialBlend = 0f;
+            source.pitch = data.Pitch > 0f ? data.Pitch : 1f;
+            if (data.AudioClips is { Length: > 0 })
+                source.clip = data.AudioClips.GetRandomElement();
+
+            var loop = go.AddComponent<SFXLoop>();
+            loop.Init(source, data.InitialVolume, this);
+            return loop;
+        }
         public void PlayMusic(int index) => PlayAudio<MusicData>(index);
 
         public void PlayAudio<T>(int index) where T : AudioData
