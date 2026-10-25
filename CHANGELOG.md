@@ -1,3 +1,9 @@
+## [Unreleased]
+### Added — SFX Prep
+- `Tools → gishadev → SFX Prep` window (`Editor/SfxPrep`): sound list editor, processing runner, preview and export, moved in from Pig Washer
+- `Tools~/SfxPrep/sfx_prep.py` takes `--project-root`, `--config` and `--library-dir`, so it runs from the package against any project; `sfx_config.example.json` to start a new project from
+- `SfxPrepSettings`: config path and export folder per project (`ProjectSettings/SfxPrepSettings.asset`), Python and sound library folder per machine (EditorPrefs). Defaults match the old Pig Washer layout (`Tools/SfxPrep/sfx_config.json`, `Assets/_Project/Audio`)
+
 ## [1.9.0] - 2026-03-10
 ### Added — Installer-based integration
 - `GishadevToolsInstaller` (`VContainer.Unity.IInstaller`) registers the package's services into any scope, so a project with its own `LifetimeScope`s no longer has to put `GishadevToolsLifetimeScope` in the scene or copy its registrations: `new GishadevToolsInstaller(audioMasterSO, poolDataSO) { RegisterEventBus = false }.Install(builder);`

@@ -1,0 +1,22 @@
+{
+  "library_dir": "",
+  "sound_list": "Tools/SfxPrep/sound_list.json",
+  "cache_dir": "Library/SfxPrep",
+  "max_sample_rate": 48000,
+  "split": {
+    "threshold_db": 30,
+    "min_gap": 0.12,
+    "min_len": 0.06,
+    "pre_roll": 0.01,
+    "max_tail": 0.6,
+    "quietest_event_db": 24,
+    "max_clips_per_file": 12
+  },
+  "loop": {
+    "seconds": 12,
+    "crossfade": 0.5
+  },
+  "fade_in": 0.004,
+  "fade_out": 0.03,
+  "peak_ceiling_db": -1.0
+}
