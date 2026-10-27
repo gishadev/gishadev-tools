@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace gishadev.tools.Editor.SfxPrep
@@ -27,7 +26,10 @@ namespace gishadev.tools.Editor.SfxPrep
 
             try
             {
-                return JsonUtility.FromJson<SfxSoundList>(File.ReadAllText(path));
+                // Older lists called the description "hook"; the other dropped fields (name, variations, priority,
+                // status, source) are ignored and go on the next save.
+                var json = File.ReadAllText(path).Replace("\"hook\":", "\"description\":");
+                return JsonUtility.FromJson<SfxSoundList>(json);
             }
             catch (Exception e)
             {
@@ -57,20 +59,23 @@ namespace gishadev.tools.Editor.SfxPrep
         public int channels = 1;
         public float lufs = -20f;
         public float max_len = 2.5f;
+
+        // Loop sounds; 0 = the config's loop settings.
+        public float loop_seconds;
+        public float crossfade;
+
+        // Import: clips longer than stream_after seconds stream (0 = never); Vorbis quality 0..1.
+        public float stream_after;
+        public float quality = 0.7f;
     }
 
     [Serializable]
     public class SfxSoundDef
     {
         public string id;
-        public string name;
         public string category;
         public string type = "One-shot";
-        public string variations = "1";
-        public string priority = "P2";
-        public string hook = "";
-        public string status = "todo";
-        public string source = "";
+        public string description = "";
         public int order;
 
         // Processing overrides; 0 = the category's (or the global) default.
@@ -84,18 +89,6 @@ namespace gishadev.tools.Editor.SfxPrep
         public List<string> excluded = new();
 
         public bool IsLoop => type != null && type.StartsWith("Loop", StringComparison.OrdinalIgnoreCase);
-
-        /// <summary>How many variations it wants: '4–6' → 6, '1, pitch varies' → 1; loops keep one.</summary>
-        public int TargetCount
-        {
-            get
-            {
-                if (IsLoop)
-                    return 1;
-                var numbers = Regex.Matches((variations ?? "1").Split(',')[0], @"\d+").Select(m => int.Parse(m.Value)).ToList();
-                return numbers.Count > 0 ? numbers.Max() : 1;
-            }
-        }
     }
 
     [Serializable]

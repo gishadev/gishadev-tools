@@ -1,7 +1,4 @@
 {
-  "library_dir": "",
-  "sound_list": "Tools/SfxPrep/sound_list.json",
-  "cache_dir": "Library/SfxPrep",
   "max_sample_rate": 48000,
   "split": {
     "threshold_db": 30,

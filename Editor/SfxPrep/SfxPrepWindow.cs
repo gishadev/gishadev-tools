@@ -11,8 +11,8 @@ namespace gishadev.tools.Editor.SfxPrep
     /// <summary>
     /// The game's sound list and the tool that turns its picks into game clips, without leaving Unity.
     /// The list (the project's sound_list.json, see <see cref="SfxPrepSettings"/>) is edited here: sounds, their
-    /// categories and settings, status. Candidate files come from the sfx-scout skill and from .wav files you drop on
-    /// the window (yours first). <b>Process</b> runs this package's sfx_prep.py, which splits takes, cuts loops and
+    /// categories and settings. Candidate files come from the sfx-scout skill and from audio files you drop on the
+    /// window from anywhere (yours first). <b>Process</b> runs this package's sfx_prep.py, which splits takes, cuts loops and
     /// evens out loudness into the cache folder. Here you listen, tick the clips to keep, and <b>Export</b> copies them
     /// to &lt;audio root&gt;/&lt;Category&gt;/&lt;sound&gt;/ with their import settings (load type by length, Vorbis
     /// quality, mono). Wiring them into AudioMasterSO or the SFX pool stays manual.
@@ -21,8 +21,8 @@ namespace gishadev.tools.Editor.SfxPrep
     {
 
         private static readonly string[] Types = { "One-shot", "Loop" };
-        private static readonly string[] Priorities = { "P1", "P2", "P3" };
-        private static readonly string[] Statuses = { "todo", "shortlisted", "done" };
+        // sfx_prep.py reads WAV itself and the rest through the soundfile package.
+        private static readonly string[] AudioExtensions = { ".wav", ".ogg", ".mp3", ".flac", ".aif", ".aiff" };
         private static readonly string[] ChannelOptions = { "Mono", "Stereo" };
         private static readonly Regex IdPattern = new("^[a-z0-9]+(-[a-z0-9]+)*$");
 
@@ -49,31 +49,28 @@ namespace gishadev.tools.Editor.SfxPrep
         private Vector2 _categoryScroll;
 
         private string _newId = "";
-        private string _newName = "";
         private int _newCategory;
         private int _newType;
-        private string _newVariations = "1";
         private string _newCategoryId = "";
 
         private GameObject _previewObject;
         private AudioSource _previewSource;
         private string _playingFile;
 
-        private static SfxPrepSettings Settings => SfxPrepSettings.instance;
         private static string ProjectRoot => SfxPrepSettings.ProjectRoot;
-        private static string AudioRoot => Settings.AudioRoot;
-        private static string CacheDir => Settings.CacheDir;
-        private static string ManifestFile => Settings.ManifestFile;
-        private static string SelectionFile => Settings.SelectionFile;
-        private static string ConfigFile => Settings.ConfigPath;
-        private static string SoundListFile => Settings.SoundListPath;
+        private static string AudioRoot => SfxPrepSettings.AudioRoot;
+        private static string CacheDir => SfxPrepSettings.CacheDir;
+        private static string ManifestFile => SfxPrepSettings.ManifestFile;
+        private static string SelectionFile => SfxPrepSettings.SelectionFile;
+        private static string ConfigFile => SfxPrepSettings.ConfigPath;
+        private static string SoundListFile => SfxPrepSettings.SoundListPath;
 
         [MenuItem("Tools/gishadev/SFX Prep")]
         private static void Open() => GetWindow<SfxPrepWindow>("SFX Prep");
 
         private void OnEnable()
         {
-            minSize = new Vector2(700, 400);
+            minSize = new Vector2(820, 400);
             _runner.Finished += OnRunFinished;
             EditorApplication.update += OnEditorUpdate;
             Reload();
@@ -112,7 +109,7 @@ namespace gishadev.tools.Editor.SfxPrep
         {
             StopPreview();
             ClearPreviewCache();
-            Settings.ReloadConfig();
+            SfxPrepSettings.Reload();
             _list = SfxSoundList.Load(SoundListFile);
             _manifest = SfxPrepManifest.Load(ManifestFile);
             _selection = _manifest != null ? SfxPrepSelection.LoadAndReconcile(SelectionFile, _manifest) : null;
@@ -184,10 +181,8 @@ namespace gishadev.tools.Editor.SfxPrep
                 return;
             }
 
-            var common = $"--project-root \"{ProjectRoot}\" --config \"{ConfigFile}\"";
-            if (!string.IsNullOrEmpty(SfxPrepSettings.LibraryDirOverride))
-                common += $" --library-dir \"{SfxPrepSettings.LibraryDirOverride}\"";
-            _runner.Start(SfxPrepSettings.Python, script, ProjectRoot, $"{arguments} {common}", total);
+            // The script reads the folder and the library from the same settings files as the window.
+            _runner.Start(SfxPrepSettings.Python, script, ProjectRoot, $"{arguments} --project-root \"{ProjectRoot}\"", total);
         }
 
         private void OnRunFinished(bool ok)
@@ -210,7 +205,7 @@ namespace gishadev.tools.Editor.SfxPrep
             var added = 0;
             foreach (var file in files)
             {
-                var path = file.Replace('\\', '/');
+                var path = StoredPath(file);
                 sound.excluded.RemoveAll(p => SamePath(p, path));
                 if (sound.candidates.Any(c => SamePath(c.path, path)))
                     continue;
@@ -245,6 +240,25 @@ namespace gishadev.tools.Editor.SfxPrep
             Process(sound);
         }
 
+        /// <summary>
+        /// How a dropped file is saved in the list: relative to the SFX library when it's inside it, else relative to the
+        /// project, else the full path. sfx_prep.py resolves them in that order.
+        /// </summary>
+        private static string StoredPath(string fullPath)
+        {
+            fullPath = Path.GetFullPath(fullPath).Replace('\\', '/');
+            foreach (var root in new[] { SfxPrepSettings.LibraryDir, ProjectRoot })
+            {
+                if (string.IsNullOrEmpty(root))
+                    continue;
+                var prefix = Path.GetFullPath(root).Replace('\\', '/').TrimEnd('/') + "/";
+                if (fullPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    return fullPath.Substring(prefix.Length);
+            }
+
+            return fullPath;
+        }
+
         private static bool SamePath(string a, string b) =>
             string.Equals(a?.Replace('\\', '/'), b?.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase);
 
@@ -255,18 +269,18 @@ namespace gishadev.tools.Editor.SfxPrep
                 return;
 
             // Explorer gives full paths, the Project window gives Assets/... paths.
-            var wavs = DragAndDrop.paths
-                .Where(p => p.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+            var files = DragAndDrop.paths
+                .Where(p => AudioExtensions.Contains(Path.GetExtension(p).ToLowerInvariant()))
                 .Select(p => Path.GetFullPath(Path.IsPathRooted(p) ? p : Path.Combine(ProjectRoot, p)))
                 .ToList();
-            if (wavs.Count == 0)
+            if (files.Count == 0)
                 return;
 
             DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
             if (e.type == EventType.DragPerform)
             {
                 DragAndDrop.AcceptDrag();
-                AddPicks(sound, wavs);
+                AddPicks(sound, files);
             }
 
             e.Use();
@@ -280,17 +294,14 @@ namespace gishadev.tools.Editor.SfxPrep
             var sound = new SfxSoundDef
             {
                 id = _newId,
-                name = string.IsNullOrWhiteSpace(_newName) ? _newId : _newName,
                 category = category,
                 type = Types[_newType],
-                variations = string.IsNullOrWhiteSpace(_newVariations) ? "1" : _newVariations,
                 order = _list.sounds.Where(s => s.category == category).Select(s => s.order).DefaultIfEmpty(0).Max() + 1,
             };
             _list.sounds.Add(sound);
             SaveList();
             _selectedId = sound.id;
-            _newId = _newName = "";
-            _newVariations = "1";
+            _newId = "";
             _showNewSound = false;
             CountExported();
         }
@@ -299,7 +310,7 @@ namespace gishadev.tools.Editor.SfxPrep
         {
             var exported = _exportedCount.TryGetValue(sound.id, out var n) ? n : 0;
             var note = exported > 0 ? $"\n\nIts {exported} exported clip(s) in {ExportDir(sound)} stay; delete them yourself if unused." : "";
-            if (!EditorUtility.DisplayDialog("SFX Prep", $"Remove '{sound.name}' ({sound.id}) from the sound list?{note}",
+            if (!EditorUtility.DisplayDialog("SFX Prep", $"Remove '{sound.id}' from the sound list?{note}",
                     "Remove", "Cancel"))
                 return;
 
@@ -330,7 +341,7 @@ namespace gishadev.tools.Editor.SfxPrep
                 if (!EditorUtility.DisplayDialog("SFX Prep",
                         $"Replace the clips already in the project for {replacing.Count} sound(s)?\n\n{names}\n\n" +
                         "Files keep their names (sfx_pig_idle_01...), so references to them stay valid; " +
-                        "variations you unticked are deleted.", "Replace", "Cancel"))
+                        "clips you unticked are deleted.", "Replace", "Cancel"))
                     return;
             }
 
@@ -513,9 +524,29 @@ namespace gishadev.tools.Editor.SfxPrep
         {
             if (_list == null)
             {
-                EditorGUILayout.HelpBox($"No sound list at {SoundListFile}. Set the config in Settings.", MessageType.Warning);
-                if (GUILayout.Button("Reload", GUILayout.Width(80)))
-                    Reload();
+                var missing = SfxPrepSettings.ConfigExists ? $"No sound list at {SoundListFile}." : $"No config at {ConfigFile}.";
+                EditorGUILayout.HelpBox($"{missing} Create them from the package's examples, or point Settings at existing ones.",
+                    MessageType.Warning);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button(SfxPrepSettings.ConfigExists ? "Create sound list" : "Create config and sound list",
+                            GUILayout.Width(200)))
+                    {
+                        var written = SfxPrepSettings.CreateMissingFiles();
+                        if (written.Count > 0)
+                            Debug.Log($"SFX Prep: created {string.Join(", ", written)}. Set the SFX library folder in Settings.");
+                        _showSettings = true;
+                        Reload();
+                        GUIUtility.ExitGUI();
+                    }
+
+                    if (GUILayout.Button("Reload", GUILayout.Width(80)))
+                        Reload();
+                }
+
+                _showSettings = EditorGUILayout.Foldout(_showSettings, "Settings", true);
+                if (_showSettings)
+                    DrawSettings();
                 return;
             }
 
@@ -572,41 +603,42 @@ namespace gishadev.tools.Editor.SfxPrep
         private void DrawSettings()
         {
             using var _ = new EditorGUILayout.VerticalScope(EditorStyles.helpBox);
-            EditorGUILayout.LabelField("This machine", EditorStyles.miniBoldLabel);
-            SfxPrepSettings.Python = EditorGUILayout.TextField(
+            EditorGUILayout.LabelField($"This machine ({SfxPrepSettings.UserFile})", EditorStyles.miniBoldLabel);
+            SfxPrepSettings.Python = EditorGUILayout.DelayedTextField(
                 new GUIContent("Python", "Executable with numpy installed."), SfxPrepSettings.Python);
             using (new EditorGUILayout.HorizontalScope())
             {
-                SfxPrepSettings.LibraryDirOverride = EditorGUILayout.TextField(
-                    new GUIContent("SFX library", "Folder the candidates' paths are relative to. Empty = library_dir from the config."),
-                    SfxPrepSettings.LibraryDirOverride);
+                SfxPrepSettings.LibraryDir = EditorGUILayout.DelayedTextField(
+                    new GUIContent("SFX library", "Folder the candidates' paths are relative to (your downloaded sound libraries)."),
+                    SfxPrepSettings.LibraryDir);
                 if (GUILayout.Button("…", GUILayout.Width(24)))
                 {
-                    var picked = EditorUtility.OpenFolderPanel("SFX library", Settings.LibraryDir, "");
+                    var picked = EditorUtility.OpenFolderPanel("SFX library", SfxPrepSettings.LibraryDir, "");
                     if (!string.IsNullOrEmpty(picked))
-                        SfxPrepSettings.LibraryDirOverride = picked;
+                        SfxPrepSettings.LibraryDir = picked;
                 }
             }
 
-            if (string.IsNullOrEmpty(Settings.LibraryDir))
+            if (string.IsNullOrEmpty(SfxPrepSettings.LibraryDir))
                 EditorGUILayout.HelpBox("No SFX library set: Process can't find the candidate files.", MessageType.Warning);
 
-            EditorGUILayout.LabelField("This project (ProjectSettings/SfxPrepSettings.asset)", EditorStyles.miniBoldLabel);
+            EditorGUILayout.LabelField($"This project ({SfxPrepSettings.ProjectFile})", EditorStyles.miniBoldLabel);
             using (var check = new EditorGUI.ChangeCheckScope())
             {
-                var config = EditorGUILayout.DelayedTextField(
-                    new GUIContent("Config", "sfx_config.json, relative to the project root."), Settings.ConfigPath);
+                var folder = EditorGUILayout.DelayedTextField(
+                    new GUIContent("SFX Prep folder", "Holds sfx_config.json, sound_list.json and sfx-scout's rules. Relative to the project root."),
+                    SfxPrepSettings.Folder);
                 var audioRoot = EditorGUILayout.DelayedTextField(
-                    new GUIContent("Audio root", "Exported clips go to <this>/<Category folder>/<sound id>/."), Settings.AudioRoot);
+                    new GUIContent("Audio root", "Exported clips go to <this>/<Category folder>/<sound id>/."), SfxPrepSettings.AudioRoot);
                 if (check.changed)
                 {
-                    Settings.ConfigPath = config;
-                    Settings.AudioRoot = audioRoot;
+                    SfxPrepSettings.Folder = folder;
+                    SfxPrepSettings.AudioRoot = audioRoot;
                     Reload();
                 }
             }
 
-            if (!Settings.ConfigExists)
+            if (!SfxPrepSettings.ConfigExists)
                 EditorGUILayout.HelpBox($"No config at {ConfigFile}.", MessageType.Warning);
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -649,7 +681,14 @@ namespace gishadev.tools.Editor.SfxPrep
                 GUILayout.Label("Prefix", EditorStyles.miniBoldLabel, GUILayout.Width(50));
                 GUILayout.Label("Channels", EditorStyles.miniBoldLabel, GUILayout.Width(70));
                 GUILayout.Label("LUFS", EditorStyles.miniBoldLabel, GUILayout.Width(50));
-                GUILayout.Label("Max one-shot s", EditorStyles.miniBoldLabel, GUILayout.Width(95));
+                GUILayout.Label(new GUIContent("Max 1-shot s", "Longest one-shot, in seconds"), EditorStyles.miniBoldLabel, GUILayout.Width(80));
+                GUILayout.Label(new GUIContent("Loop s", $"Loop length; 0 = config ({SfxPrepSettings.LoopSeconds})"),
+                    EditorStyles.miniBoldLabel, GUILayout.Width(50));
+                GUILayout.Label(new GUIContent("Xfade s", $"Loop crossfade; 0 = config ({SfxPrepSettings.LoopCrossfade})"),
+                    EditorStyles.miniBoldLabel, GUILayout.Width(50));
+                GUILayout.Label(new GUIContent("Stream > s", "Clips longer than this stream from disk; 0 = never"),
+                    EditorStyles.miniBoldLabel, GUILayout.Width(65));
+                GUILayout.Label(new GUIContent("Quality", "Vorbis quality, 0..1"), EditorStyles.miniBoldLabel, GUILayout.Width(50));
             }
 
             using var scroll = new EditorGUILayout.ScrollViewScope(_categoryScroll, GUILayout.MaxHeight(200));
@@ -665,7 +704,11 @@ namespace gishadev.tools.Editor.SfxPrep
                     category.prefix = EditorGUILayout.TextField(category.prefix, GUILayout.Width(50));
                     category.channels = EditorGUILayout.Popup(category.channels == 2 ? 1 : 0, ChannelOptions, GUILayout.Width(70)) + 1;
                     category.lufs = EditorGUILayout.FloatField(category.lufs, GUILayout.Width(50));
-                    category.max_len = EditorGUILayout.FloatField(category.max_len, GUILayout.Width(95));
+                    category.max_len = EditorGUILayout.FloatField(category.max_len, GUILayout.Width(80));
+                    category.loop_seconds = EditorGUILayout.FloatField(category.loop_seconds, GUILayout.Width(50));
+                    category.crossfade = EditorGUILayout.FloatField(category.crossfade, GUILayout.Width(50));
+                    category.stream_after = EditorGUILayout.FloatField(category.stream_after, GUILayout.Width(65));
+                    category.quality = Mathf.Clamp01(EditorGUILayout.FloatField(category.quality, GUILayout.Width(50)));
                     if (EditorGUI.EndChangeCheck())
                     {
                         SaveList();
@@ -750,7 +793,6 @@ namespace gishadev.tools.Editor.SfxPrep
 
                 var processed = Processed(sound.id) != null;
                 var kept = KeptCount(sound);
-                var target = sound.TargetCount;
                 var exported = _exportedCount.TryGetValue(sound.id, out var n) && n > 0;
                 var rect = GUILayoutUtility.GetRect(10, 20, GUILayout.ExpandWidth(true));
                 if (sound.id == _selectedId)
@@ -758,12 +800,12 @@ namespace gishadev.tools.Editor.SfxPrep
 
                 var mark = exported ? "● " : "   ";
                 var stale = _stale.Contains(sound.id) ? " *" : "";
-                GUI.Label(new Rect(rect.x + 4, rect.y + 2, rect.width - 50, rect.height), mark + sound.name + stale, EditorStyles.label);
+                GUI.Label(new Rect(rect.x + 4, rect.y + 2, rect.width - 50, rect.height), mark + sound.id + stale, EditorStyles.label);
 
                 var countStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleRight };
-                if (!processed || kept < target)
+                if (!processed || kept == 0)
                     countStyle.normal.textColor = ShortColor;
-                GUI.Label(new Rect(rect.xMax - 46, rect.y, 42, rect.height), processed ? $"{kept}/{target}" : "new", countStyle);
+                GUI.Label(new Rect(rect.xMax - 46, rect.y, 42, rect.height), processed ? $"{kept} kept" : "new", countStyle);
 
                 if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
                 {
@@ -779,11 +821,9 @@ namespace gishadev.tools.Editor.SfxPrep
         {
             using var _ = new EditorGUILayout.VerticalScope(EditorStyles.helpBox);
             _newId = EditorGUILayout.TextField(new GUIContent("Id", "lower-case with dashes, e.g. pig-sneeze"), _newId);
-            _newName = EditorGUILayout.TextField("Name", _newName);
             var categoryIds = _list.categories.Select(c => c.id).ToArray();
             _newCategory = EditorGUILayout.Popup("Category", _newCategory, categoryIds);
             _newType = EditorGUILayout.Popup("Type", _newType, Types);
-            _newVariations = EditorGUILayout.TextField(new GUIContent("Variations", "how many, e.g. 3 or 4–6"), _newVariations);
 
             var error = !IdPattern.IsMatch(_newId) ? "Id: lower-case letters, digits and dashes."
                 : _list.Sound(_newId) != null ? "That id is taken."
@@ -811,8 +851,7 @@ namespace gishadev.tools.Editor.SfxPrep
             using var scroll = new EditorGUILayout.ScrollViewScope(_detailScroll);
             _detailScroll = scroll.scrollPosition;
 
-            EditorGUILayout.LabelField(sound.name, EditorStyles.largeLabel);
-            EditorGUILayout.LabelField(sound.id, EditorStyles.miniLabel);
+            EditorGUILayout.LabelField(sound.id, EditorStyles.largeLabel);
             DrawSoundFields(sound);
 
             var processed = Processed(sound.id);
@@ -825,6 +864,9 @@ namespace gishadev.tools.Editor.SfxPrep
                 EditorGUILayout.HelpBox("Settings changed: Reprocess to apply them to the clips.", MessageType.Info);
             if (processed != null && processed.missing.Length > 0)
                 EditorGUILayout.HelpBox($"{processed.missing.Length} pick(s) not found:\n" + string.Join("\n", processed.missing),
+                    MessageType.Warning);
+            if (processed != null && processed.skipped.Length > 0)
+                EditorGUILayout.HelpBox($"{processed.skipped.Length} pick(s) couldn't be read:\n" + string.Join("\n", processed.skipped),
                     MessageType.Warning);
 
             using (new EditorGUILayout.HorizontalScope())
@@ -856,14 +898,14 @@ namespace gishadev.tools.Editor.SfxPrep
                 }
             }
 
-            EditorGUILayout.LabelField("Found something better? Drop .wav files on this window to add them to this sound.",
+            EditorGUILayout.LabelField("Found something better? Drop audio files (from anywhere) on this window to add them to this sound.",
                 EditorStyles.centeredGreyMiniLabel);
             EditorGUILayout.Space(2);
 
             if (processed == null)
             {
                 EditorGUILayout.HelpBox(sound.candidates.Count == 0
-                    ? "No picks yet. Drop .wav files here, or ask Claude to run /sfx-scout for this sound."
+                    ? "No picks yet. Drop audio files here, or ask Claude to run /sfx-scout for this sound."
                     : $"{sound.candidates.Count} pick(s), not processed yet. Press Process.", MessageType.Info);
                 return;
             }
@@ -889,20 +931,18 @@ namespace gishadev.tools.Editor.SfxPrep
             if (category == null)
                 categoryIds.Add(sound.category);
 
-            EditorGUI.BeginChangeCheck();
-            sound.name = EditorGUILayout.TextField("Name", sound.name);
-            var newCategory = categoryIds[EditorGUILayout.Popup("Category", categoryIds.IndexOf(sound.category), categoryIds.ToArray())];
-            var newType = Types[Mathf.Max(0, EditorGUILayout.Popup("Type", Array.IndexOf(Types, sound.type), Types))];
-            var newVariations = EditorGUILayout.TextField(new GUIContent("Variations", "how many, e.g. 3 or 4–6"), sound.variations);
-            sound.priority = Pick("Priority", sound.priority, Priorities);
-            sound.status = Pick("Status", sound.status, Statuses);
-            sound.hook = EditorGUILayout.TextField(new GUIContent("Hook", "where the game plays it"), sound.hook);
-            sound.source = EditorGUILayout.TextField(new GUIContent("Source", "the clip you finally chose (notes)"), sound.source);
+            DrawIdField(sound);
 
-            var processingChanged = newCategory != sound.category || newType != sound.type || newVariations != sound.variations;
+            EditorGUI.BeginChangeCheck();
+            var newCategory = categoryIds[EditorGUILayout.Popup("Category", categoryIds.IndexOf(sound.category), categoryIds.ToArray())];
+            var newType = Pick("Type", sound.type, Types);
+            sound.description = EditorGUILayout.TextField(
+                new GUIContent("Description", "What it is and where the game plays it. sfx-scout reads it when picking candidates."),
+                sound.description);
+
+            var processingChanged = newCategory != sound.category || newType != sound.type;
             sound.category = newCategory;
             sound.type = newType;
-            sound.variations = newVariations;
 
             _showOverrides = EditorGUILayout.Foldout(_showOverrides, "Processing overrides (0 = category default)", true);
             if (_showOverrides)
@@ -914,8 +954,10 @@ namespace gishadev.tools.Editor.SfxPrep
                 sound.lufs = EditorGUILayout.FloatField(new GUIContent("LUFS", $"category: {category?.lufs}"), sound.lufs);
                 if (sound.IsLoop)
                 {
-                    sound.loop_seconds = EditorGUILayout.FloatField(new GUIContent("Loop length s", "default 12"), sound.loop_seconds);
-                    sound.crossfade = EditorGUILayout.FloatField(new GUIContent("Loop crossfade s", "default 0.5"), sound.crossfade);
+                    sound.loop_seconds = EditorGUILayout.FloatField(
+                        new GUIContent("Loop length s", Inherited(category?.loop_seconds ?? 0, SfxPrepSettings.LoopSeconds)), sound.loop_seconds);
+                    sound.crossfade = EditorGUILayout.FloatField(
+                        new GUIContent("Loop crossfade s", Inherited(category?.crossfade ?? 0, SfxPrepSettings.LoopCrossfade)), sound.crossfade);
                 }
                 else
                 {
@@ -933,6 +975,45 @@ namespace gishadev.tools.Editor.SfxPrep
                 CountExported();
             }
         }
+
+        /// <summary>
+        /// The id names the export folder and files, so it can change only while nothing is exported. The sound's clips
+        /// are processed again under the new id.
+        /// </summary>
+        private void DrawIdField(SfxSoundDef sound)
+        {
+            var exported = _exportedCount.TryGetValue(sound.id, out var n) && n > 0;
+            using (new EditorGUI.DisabledScope(exported))
+            {
+                var tip = exported
+                    ? "Exported clips are named after it; remove them from the project to rename."
+                    : "lower-case with dashes, e.g. pig-sneeze. Names the export folder and files.";
+                var newId = EditorGUILayout.DelayedTextField(new GUIContent("Id", tip), sound.id);
+                if (newId == sound.id)
+                    return;
+
+                if (!IdPattern.IsMatch(newId) || _list.Sound(newId) != null)
+                {
+                    EditorUtility.DisplayDialog("SFX Prep", IdPattern.IsMatch(newId)
+                        ? $"'{newId}' is taken."
+                        : "Ids are lower-case letters, digits and dashes, e.g. pig-sneeze.", "OK");
+                    return;
+                }
+
+                StopPreview();
+                _selection?.sounds.RemoveAll(e => e.id == sound.id);
+                _selection?.Save(SelectionFile);
+                _stale.Remove(sound.id);
+                sound.id = newId;
+                _selectedId = newId;
+                SaveList();
+                CountExported();
+            }
+        }
+
+        /// <summary>Tooltip for a loop override: what 0 falls back to, the category's value or else the config's.</summary>
+        private static string Inherited(float categoryValue, float configValue) =>
+            categoryValue > 0 ? $"category: {categoryValue}" : $"config: {configValue}";
 
         /// <summary>A popup over fixed options that keeps a value it doesn't know (from older lists).</summary>
         private static string Pick(string label, string value, string[] options)

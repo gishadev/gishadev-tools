@@ -35,7 +35,8 @@ namespace gishadev.tools.Editor.SfxPrep
             LastLine = "Starting Python...";
             ErrorLines.Clear();
 
-            var info = new ProcessStartInfo(python, $"-I -u \"{script}\" {arguments}")
+            // -E ignores PYTHON* env vars. Not -I: it also drops user site-packages, where `pip install --user numpy` goes.
+            var info = new ProcessStartInfo(python, $"-E -u \"{script}\" {arguments}")
             {
                 WorkingDirectory = projectRoot,
                 UseShellExecute = false,

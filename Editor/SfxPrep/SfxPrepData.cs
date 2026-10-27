@@ -8,7 +8,7 @@ namespace gishadev.tools.Editor.SfxPrep
 {
     // Field names match the JSON written by sfx_prep.py (read with JsonUtility).
 
-    /// <summary><c>&lt;cache_dir&gt;/prep_manifest.json</c>: every processed sound and its candidate clips.</summary>
+    /// <summary><c>Library/SfxPrep/prep_manifest.json</c>: every processed sound and its candidate clips.</summary>
     [Serializable]
     public class SfxPrepManifest
     {
@@ -41,6 +41,7 @@ namespace gishadev.tools.Editor.SfxPrep
         public bool loop;
         public string processed;
         public string[] missing = Array.Empty<string>();
+        public string[] skipped = Array.Empty<string>();
         public SfxPrepClip[] clips = Array.Empty<SfxPrepClip>();
     }
 

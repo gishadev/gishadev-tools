@@ -3,25 +3,29 @@
 SFX Prep: the audio side of the SFX Prep window in Unity (Tools > gishadev > SFX Prep), shipped in
 com.gishadev.tools under Tools~/SfxPrep. The window runs it; by hand:
 
-  python sfx_prep.py process --project-root <unity project> [--config Tools/SfxPrep/sfx_config.json]
+  python sfx_prep.py process --project-root <unity project> [--folder Tools/SfxPrep]
                              [--library-dir <sound libraries>] [--sound pig-idle ...]
 
 For every sound in sound_list.json (the game's sound list, edited in the window; candidates come from sfx-scout
 and from files you drop on the window, yours first), reads the candidate files and turns them into game-ready
-clips: multi-take files are split into single events (one-shots) or cut into a crossfaded seamless loop (Loop
-sounds), then trimmed, faded, converted to mono/stereo and normalized to a loudness per category. Clips go to
-<cache_dir>/clips/ with <cache_dir>/prep_manifest.json describing them (scores, default picks, import settings).
+clips. A candidate path is relative to the sound library, else to the project, else absolute. WAV is read here;
+OGG, MP3, FLAC and AIFF need the soundfile package (pip install soundfile).
+
+Multi-take files are split into single events (one-shots) or cut into a crossfaded seamless loop (Loop sounds),
+then trimmed, faded, converted to mono/stereo and normalized to a loudness per category. Clips go to
+Library/SfxPrep/clips/ with Library/SfxPrep/prep_manifest.json describing them (scores, default ticks, import
+settings).
 The window does the rest: preview, keep/drop, copy into Assets and set import settings.
 
-Processing settings live in the project's sfx_config.json (--config, relative to the project root), category
-and per-sound settings in its sound_list.json. Paths in the config are relative to the project root;
---library-dir overrides its library_dir (the folder is per machine).
-Needs Python 3.9+ and numpy. Library files are never changed.
+Both files live in the project's SFX Prep folder: processing settings in sfx_config.json, category and per-sound
+settings in sound_list.json. The folder comes from ProjectSettings/Packages/com.gishadev.tools/SfxPrepSettings.json
+and the sound library folder from UserSettings/Packages/com.gishadev.tools/SfxPrep.json (per machine), the files
+the window writes; --folder and --library-dir override them. The cache is always Library/SfxPrep.
+Needs Python 3.9+ and numpy; soundfile is optional. Library files are never changed.
 """
 import argparse
 import json
 import os
-import re
 import shutil
 import struct
 import sys
@@ -29,10 +33,16 @@ import time
 import zlib
 from pathlib import Path
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    sys.exit(f"numpy isn't installed for {sys.executable}. Install it with: \"{sys.executable}\" -m pip install numpy")
 
 # The Unity project; set from --project-root in main(). Config paths are relative to it.
 REPO = Path.cwd()
+PROJECT_SETTINGS = "ProjectSettings/Packages/com.gishadev.tools/SfxPrepSettings.json"
+USER_SETTINGS = "UserSettings/Packages/com.gishadev.tools/SfxPrep.json"
+CACHE_DIR = "Library/SfxPrep"
 FRAME = 0.01  # analysis hop in seconds
 OVERRIDES = ("channels", "lufs", "max_len", "loop_seconds", "crossfade")  # per sound; 0 = default
 
@@ -47,35 +57,58 @@ def long_path(p):
 
 # --------------------------------------------------------------------------- config
 
-def load_config(path):
-    path = REPO / path
+def read_settings(rel):
+    """One of the window's settings files, {} when it doesn't exist yet."""
+    path = REPO / rel
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def load_config(folder):
+    path = REPO / folder / "sfx_config.json"
     if not path.exists():
         sys.exit(f"No config at {path}.")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def sound_settings(categories, sound):
-    """The category's settings with the sound's own overrides (non-zero ones) on top."""
+def sound_settings(cfg, categories, sound):
+    """Config defaults, then the category's settings, then the sound's own overrides (non-zero ones on top)."""
     if sound["category"] not in categories:
         sys.exit(f"Sound '{sound['id']}' uses category '{sound['category']}', which isn't in the sound list.")
-    s = dict(categories[sound["category"]])
+    s = {"loop_seconds": cfg["loop"]["seconds"], "crossfade": cfg["loop"]["crossfade"], "stream_after": 0,
+         "quality": 0.7}
+    s.update({k: v for k, v in categories[sound["category"]].items() if v or k not in s})
     s.update({k: sound[k] for k in OVERRIDES if sound.get(k)})
     s["loop"] = sound.get("type", "").lower().startswith("loop")
-    s["count"] = parse_count(sound.get("variations", "1"), s["loop"])
     return s
 
 
-def parse_count(text, is_loop):
-    """'4–6' -> 6, '2' -> 2, '1, pitch varies' -> 1. Loops keep one."""
-    if is_loop:
-        return 1
-    nums = [int(n) for n in re.findall(r"\d+", str(text).split(",")[0])]
-    return max(nums) if nums else 1
+def resolve(library_dir, path):
+    """A candidate's file: relative to the sound library, else to the project, else the path as it is (absolute)."""
+    p = Path(path)
+    if p.is_absolute():
+        return p
+    if library_dir and os.path.exists(long_path(Path(library_dir) / p)):
+        return Path(library_dir) / p
+    return REPO / p
 
 
-def load_sound_list(cfg):
+def read_audio(path):
+    """WAV here; anything else through soundfile when it's installed."""
+    if path.suffix.lower() in (".wav", ".wave", ".bwf"):
+        return read_wav(path)
+    try:
+        import soundfile
+    except ImportError:
+        raise ValueError(f"{path.suffix} needs the soundfile package: \"{sys.executable}\" -m pip install soundfile")
+    if not os.path.exists(long_path(path)):
+        raise FileNotFoundError(path)
+    x, rate = soundfile.read(long_path(path), dtype="float32", always_2d=True)
+    return x, rate
+
+
+def load_sound_list(folder):
     """(categories by id in list order, sounds) with each sound's candidates: yours first, removed ones left out."""
-    path = REPO / cfg["sound_list"]
+    path = REPO / folder / "sound_list.json"
     if not path.exists():
         sys.exit(f"No sound list at {path}.")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -93,8 +126,8 @@ def norm(path):
     return str(path).replace("\\", "/").lower()
 
 
-def load_type(seconds, loop, category):
-    if category == "ambience" and seconds > 20:
+def load_type(seconds, loop, stream_after):
+    if stream_after and seconds > stream_after:
         return "Streaming"
     if seconds <= 2.5 and not loop:
         return "DecompressOnLoad"
@@ -250,7 +283,8 @@ def loudness(x, rate):
 
 def fade(x, rate, fin, fout):
     x = x.copy()
-    a, b = min(len(x), int(fin * rate)), min(len(x), int(fout * rate))
+    # On very short clips (a 10 ms tick) the fades would eat the sound: at most a tenth in, a third out.
+    a, b = min(len(x) // 10, int(fin * rate)), min(len(x) // 3, int(fout * rate))
     if a:
         x[:a] *= np.linspace(0, 1, a, dtype=np.float32)[:, None]
     if b:
@@ -301,6 +335,10 @@ def find_events(x, rate, sp, max_len):
             events.append((s, s + step))
             s += step
         events.append((s, e))
+    if not events and peak > -90:
+        # Nothing long enough to count as an event (a 10 ms UI tick): the file is one sound, trimmed of silence.
+        on = np.nonzero(db > peak - 40)[0]
+        events.append((max(0, on[0] * hop - int(sp["pre_roll"] * rate)), min(len(x), (on[-1] + 1) * hop)))
     events.sort(key=lambda r: -float(np.abs(x[r[0]:r[1]]).max()))
     return sorted(events[:sp["max_clips_per_file"]]), floor
 
@@ -351,7 +389,7 @@ def score(c, st):
 
 
 def default_keep(clips, count):
-    """Best clip of each source file first, then the second best of each, and so on, so the variations
+    """Best clip of each source file first, then the second best of each, and so on, so the ticked clips
     don't all come from one recording."""
     by_source = {}
     for c in sorted(clips, key=lambda c: -c["score"]):
@@ -369,25 +407,25 @@ def default_keep(clips, count):
 
 def process_sound(cfg, categories, sound, cache):
     sid = sound["id"]
-    st = sound_settings(categories, sound)
+    st = sound_settings(cfg, categories, sound)
     clip_dir = cache / "clips" / sid
     shutil.rmtree(long_path(clip_dir), ignore_errors=True)
-    clips, missing = [], []
+    clips, missing, skipped = [], [], []
     for rank, cand in enumerate(sound.get("candidates", []), 1):
-        src = Path(cfg["library_dir"]) / cand["path"]
+        src = resolve(cfg["library_dir"], cand["path"])
         try:
-            x, rate = read_wav(src)
+            x, rate = read_audio(src)
         except FileNotFoundError:
             missing.append(cand["path"])
             continue
         except Exception as e:
             print(f"  skip {cand['file']}: {e}", file=sys.stderr)
+            skipped.append(f"{cand['file']}: {e}")
             continue
         clipped_src = float((np.abs(x) >= 0.999).mean())
         x = to_channels(x, st["channels"])
         if st["loop"]:
-            loop, at, steady = make_loop(x, rate, st.get("loop_seconds", cfg["loop"]["seconds"]),
-                                         st.get("crossfade", cfg["loop"]["crossfade"]))
+            loop, at, steady = make_loop(x, rate, st["loop_seconds"], st["crossfade"])
             pieces, floor = ([(loop, at, steady)] if loop is not None else []), None
         else:
             events, floor = find_events(x, rate, cfg["split"], st["max_len"])
@@ -416,26 +454,26 @@ def process_sound(cfg, categories, sound, cache):
                 "seconds": seconds, "rate": r, "channels": int(y.shape[1]),
                 "lufs_in": round(lufs, 1), "gain_db": round(gain, 1), "peak_limited": bool(limited),
                 "snr_db": round(snr, 1), "clipped_src": clipped_src, "steadiness": round(steady, 2),
-                "load_type": load_type(seconds, st["loop"], sound["category"]),
-                "quality": 0.6 if sound["category"] == "ambience" else 0.7,
+                "load_type": load_type(seconds, st["loop"], st["stream_after"]),
+                "quality": st["quality"],
             })
     for c in clips:
         c["score"] = round(score(c, st), 1)
-    chosen = {c["id"] for c in default_keep(clips, st["count"])}
+    # Ticked by default: the best clip of each picked file (one for a loop). Tick more in the window.
+    count = 1 if st["loop"] else len({c["rank"] for c in clips})
+    chosen = {c["id"] for c in default_keep(clips, count)}
     for c in clips:
         c["keep"] = c["id"] in chosen
-    return {"id": sid, "count": st["count"], "loop": st["loop"], "processed": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "missing": missing, "clips": clips}
+    return {"id": sid, "count": count, "loop": st["loop"], "processed": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "missing": missing, "skipped": skipped, "clips": clips}
 
 
 def process(args):
-    cfg = load_config(args.config)
-    if args.library_dir:
-        cfg["library_dir"] = args.library_dir
-    if not cfg.get("library_dir"):
-        sys.exit("No SFX library folder: set it in the SFX Prep window's settings (or library_dir in the config).")
-    cache = REPO / cfg["cache_dir"]
-    categories, all_sounds = load_sound_list(cfg)
+    folder = args.folder or read_settings(PROJECT_SETTINGS).get("folder") or "Tools/SfxPrep"
+    cfg = load_config(folder)
+    cfg["library_dir"] = args.library_dir or read_settings(USER_SETTINGS).get("library_dir", "")
+    cache = REPO / CACHE_DIR
+    categories, all_sounds = load_sound_list(folder)
     sounds = [s for s in all_sounds if not args.sound or s["id"] in args.sound]
     manifest_path = cache / "prep_manifest.json"
     entries = {}
@@ -445,12 +483,15 @@ def process(args):
     for i, sound in enumerate(sounds, 1):
         e = process_sound(cfg, categories, sound, cache)
         entries[e["id"]] = e
-        note = f", {len(e['missing'])} missing" if e["missing"] else ""
+        note = "".join(f", {len(e[k])} {k}" for k in ("missing", "skipped") if e[k])
         print(f"[{i}/{len(sounds)}] {e['id']}: {len(e['clips'])} clips{note} ({time.time() - t0:.0f}s)", flush=True)
     # Sounds removed from the list drop out of the manifest (and their clips from the cache).
     listed = [s["id"] for s in all_sounds]
-    for sid in set(entries) - set(listed):
-        shutil.rmtree(long_path(cache / "clips" / sid), ignore_errors=True)
+    clips_dir = cache / "clips"
+    if clips_dir.is_dir():
+        for d in clips_dir.iterdir():
+            if d.is_dir() and d.name not in listed:
+                shutil.rmtree(long_path(d), ignore_errors=True)
     cache.mkdir(parents=True, exist_ok=True)
     manifest = {"created": time.strftime("%Y-%m-%d %H:%M:%S"), "library_dir": cfg["library_dir"],
                 "sounds": [entries[sid] for sid in listed if sid in entries]}
@@ -464,8 +505,8 @@ def main():
     p = sub.add_parser("process")
     p.add_argument("--sound", action="append", help="only this sound id (repeatable)")
     p.add_argument("--project-root", default=".", help="the Unity project (default: current folder)")
-    p.add_argument("--config", default="Tools/SfxPrep/sfx_config.json", help="relative to the project root")
-    p.add_argument("--library-dir", help="folder the candidates' paths are relative to; overrides the config")
+    p.add_argument("--folder", help="SFX Prep folder relative to the project root; overrides the project settings")
+    p.add_argument("--library-dir", help="folder the candidates' paths are relative to; overrides the user settings")
     args = ap.parse_args()
     global REPO
     REPO = Path(args.project_root).resolve()

@@ -13,6 +13,7 @@ namespace gishadev.tools.Editor
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
+            EmptyEntriesCleaner.DrawInspectorBox(target);
 
             _audioMasterSO = (AudioMasterSO)target;
             EditorGUILayout.Space();
