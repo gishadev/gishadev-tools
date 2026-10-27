@@ -1,3 +1,29 @@
+## [1.11.0] - 2026-27-10
+### Added — Empty entries cleanup
+- `AudioMasterSO` and `PoolDataSO` inspectors flag empty slots (`None` or missing clips/prefabs) and entries with no clips/prefabs, with a button that removes them (undoable). Removing entries regenerates the enums after asking, since later entries shift; `SFXPoolRef` / `SFXAudioRef` fields keep pointing at the right sound
+- When assets are deleted (e.g. SFX Prep export dropping unticked clips), slots that pointed at them are cleared in every audio master and pool asset. Whole entries are never removed automatically
+
+### Added — SFX Prep
+- Picks from anywhere: drop audio files from any folder, not just the sound library. Paths are saved relative to the library, else to the project, else in full. The library folder is now optional and only used by sfx-scout
+- OGG, MP3, FLAC and AIFF picks when the `soundfile` package is installed (`pip install soundfile`); WAV still needs only numpy
+- Category settings for loop length and crossfade (0 = the config's), streaming (`stream_after`: clips longer than this stream, 0 = never) and Vorbis `quality`, as columns in the Categories panel
+- First open offers to create `sfx_config.json` and `sound_list.json` from the package's examples (new `sound_list.example.json` with ui, gameplay and ambience categories)
+- Picks that can't be read show their reason in the window instead of only in the script's error output
+
+### Changed — SFX Prep
+- Settings are plain JSON the window, `sfx_prep.py` and sfx-scout all read: `ProjectSettings/Packages/com.gishadev.tools/SfxPrepSettings.json` (SFX Prep folder, audio root; commit it) and `UserSettings/Packages/com.gishadev.tools/SfxPrep.json` (Python, library folder; per machine). The config and sound list are always `<folder>/sfx_config.json` and `<folder>/sound_list.json`, the cache always `Library/SfxPrep`. Values from `ProjectSettings/SfxPrepSettings.asset` and EditorPrefs move over on first open; the old asset can be deleted
+- `sfx_config.json` no longer has `library_dir`, `sound_list` or `cache_dir`; `sfx_prep.py` takes `--folder` instead of `--config`
+- Sounds keep only id, category, type and description. `hook` is read as `description`; `name`, `variations`, `priority`, `status` and `source` are dropped on the next save. The id can be edited until the sound has exported clips
+- Default ticks: the best clip of each picked file (one for a loop) instead of a variations count. The list shows how many are kept
+- Streaming and quality come from the category instead of a hardcoded `ambience` id. **Migration:** set `stream_after` 20 and `quality` 0.6 on an existing ambience category to keep its old import settings
+- Python runs with `-E` instead of `-I`, so numpy installed with `pip install --user` is found; a missing numpy names the Python and the install command
+
+### Fixed — SFX Prep
+- Process all left the cached clips of sounds removed from the list
+- The Type popup turned a type it didn't know (e.g. `Loop (bed)`) into `One-shot`
+- Files shorter than the minimum event length (UI ticks, 10–100 ms) gave no clip; they now count as one sound
+- Fades longer than a very short clip faded the whole clip; they're capped to a tenth (in) and a third (out) of its length
+
 ## [1.10.0] - 2026-10-25
 ### Added — Looping SFX
 - `SFXLoop`: a looping sound that fades to the level you ask for (`SetPlaying(bool, level)`, `SetPitch`), follows the master/SFX volume and holds while SFX are paused. `Dispose()` or destroying its parent removes it
