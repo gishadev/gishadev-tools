@@ -1,3 +1,7 @@
+## [Unreleased]
+### Fixed
+- `PhysicsSoundSource` on a kinematic body (e.g. a networked copy moved by its transform) now rolls and squeaks: its speed comes from how far it moved, since the body reports no velocity
+
 ## [1.11.0] - 2026-27-10
 ### Added — Empty entries cleanup
 - `AudioMasterSO` and `PoolDataSO` inspectors flag empty slots (`None` or missing clips/prefabs) and entries with no clips/prefabs, with a button that removes them (undoable). Removing entries regenerates the enums after asking, since later entries shift; `SFXPoolRef` / `SFXAudioRef` fields keep pointing at the right sound

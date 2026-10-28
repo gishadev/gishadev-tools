@@ -69,7 +69,10 @@ namespace gishadev.tools.Effects
         public float ShutAngle => shutAngle;
         public float MinShutSpeed => minShutSpeed;
 
-        /// <summary>m/s along the ground, or degrees/s around the hinge.</summary>
+        /// <summary>
+        /// m/s along the ground, or degrees/s around the hinge. A kinematic body without a hinge (e.g. a networked
+        /// copy moved by its transform) reports no velocity, so its speed comes from how far it moved last frame.
+        /// </summary>
         public float MotionSpeed
         {
             get
@@ -77,16 +80,31 @@ namespace gishadev.tools.Effects
                 if (Hinge != null)
                     return Mathf.Abs(Hinge.velocity);
 
+                if (Body.isKinematic)
+                    return _movedSpeed;
+
                 var velocity = Body.linearVelocity;
                 velocity.y = 0f;
                 return velocity.magnitude;
             }
         }
 
+        private Vector3 _lastPosition;
+        private float _movedSpeed;
+
         private void Awake()
         {
             Body = GetComponent<Rigidbody>();
             Hinge = GetComponent<HingeJoint>();
+            _lastPosition = transform.position;
+        }
+
+        private void LateUpdate()
+        {
+            var moved = transform.position - _lastPosition;
+            moved.y = 0f;
+            _movedSpeed = Time.deltaTime > 0f ? moved.magnitude / Time.deltaTime : 0f;
+            _lastPosition = transform.position;
         }
 
         private void OnCollisionEnter(Collision collision) => Collided?.Invoke(this, collision);
